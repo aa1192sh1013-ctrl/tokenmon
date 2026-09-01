@@ -8,7 +8,7 @@ import { TokenmonChart } from "./tokenmon-chart";
 import { TokenmonMeters } from "./tokenmon-meters";
 import { TokenmonPetCard } from "./tokenmon-pet";
 
-const REFRESH_MS = 20_000;
+const REFRESH_MS = 5_000;
 const MAX_PETS = 12;
 
 export function TokenmonPanel({ state }: { state: TokenmonState }) {
