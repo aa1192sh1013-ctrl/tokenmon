@@ -24,9 +24,12 @@ function readSnapshots(): TokenmonSnapshot[] {
   }
 }
 
+/* 프로젝트가 아닌 "그냥 연 곳"들 — 여기서 시작한 세션은 캐릭터를 만들지 않는다. */
+const ignoreProjectDirs = [homedir(), join(homedir(), "Desktop"), join(homedir(), "Downloads"), join(homedir(), "Documents")];
+
 export function TokenmonSection() {
   const real = readSnapshots();
   const live = real.length > 0;
-  const state = deriveTokenmonState(live ? real : mockTokenmonSnapshots(), { live });
+  const state = deriveTokenmonState(live ? real : mockTokenmonSnapshots(), { live, ignoreProjectDirs });
   return <TokenmonPanel state={state} />;
 }

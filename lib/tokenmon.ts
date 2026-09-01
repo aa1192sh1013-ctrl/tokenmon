@@ -81,6 +81,8 @@ export interface TokenmonSession {
   linesRemoved: number;
   /** 실제 API 응답에 쓰인 누적 시간(밀리초) — 창을 켜둔 시간이 아니라 일한 시간. */
   apiDurationMs: number;
+  /** 세션이 시작된 폴더의 원본 경로 — 잡폴더 필터링에 쓴다. */
+  projectDir: string;
 }
 
 export interface TokenmonRateWindow {
@@ -206,7 +208,13 @@ function toSession(snapshot: TokenmonSnapshot): TokenmonSession {
     linesAdded: num(payload.cost?.total_lines_added) ?? 0,
     linesRemoved: num(payload.cost?.total_lines_removed) ?? 0,
     apiDurationMs: num(payload.cost?.total_api_duration_ms) ?? 0,
+    projectDir: payload.workspace?.project_dir ?? payload.workspace?.current_dir ?? payload.cwd ?? "",
   };
+}
+
+/** 경로 비교용 정규화 — 윈도우 경로는 대소문자·구분자 차이를 무시한다. */
+function normalizeDir(dir: string): string {
+  return dir.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
 }
 
 /** 최신 스냅샷부터 훑어 해당 창의 유효한 값(리셋 시각이 지나지 않은 것)을 찾는다. */
@@ -244,7 +252,10 @@ function petMood(active: boolean, fiveHour: TokenmonRateWindow | null, sinceActi
   return sinceActivityMs <= FRESH_ACTIVITY_MS ? "happy" : "content";
 }
 
-export function deriveTokenmonState(snapshots: TokenmonSnapshot[], options: { live: boolean; now?: Date }): TokenmonState {
+export function deriveTokenmonState(
+  snapshots: TokenmonSnapshot[],
+  options: { live: boolean; now?: Date; ignoreProjectDirs?: string[] },
+): TokenmonState {
   const nowMs = (options.now ?? new Date()).getTime();
   const sorted = snapshots
     .slice()
@@ -253,8 +264,10 @@ export function deriveTokenmonState(snapshots: TokenmonSnapshot[], options: { li
 
   const fiveHour = newestWindow(sorted, "five_hour", nowMs);
 
+  const ignoredDirs = new Set((options.ignoreProjectDirs ?? []).map(normalizeDir));
   const byProject = new Map<string, TokenmonSession[]>();
   for (const session of sessions) {
+    if (ignoredDirs.has(normalizeDir(session.projectDir))) continue; // 홈·다운로드 같은 잡폴더 세션은 캐릭터를 만들지 않는다 (사용량 집계에는 포함)
     const group = byProject.get(session.projectName);
     if (group) group.push(session);
     else byProject.set(session.projectName, [session]);
