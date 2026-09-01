@@ -2,6 +2,7 @@
  * Tokenmon 미리보기 데이터 — 수집기가 아직 스냅샷을 만들기 전에도
  * 화면이 살아 있는 모습으로 보이도록 하는 가짜 스냅샷 묶음.
  * 기준 시각(now)만 받아 항상 같은 모양을 만든다(난수 없음).
+ * 세션별 진화 단계가 골고루 보이도록 값을 맞춰두었다(알~용가리).
  */
 import type { TokenmonSnapshot } from "@/lib/tokenmon";
 
@@ -16,6 +17,7 @@ interface MockSessionSpec {
   atMs: number;
   input: number;
   output: number;
+  apiMin: number;
   cost: number;
   ctxPct: number;
   fiveHour?: { pct: number; resetsAtMs: number };
@@ -31,7 +33,8 @@ function snapshot(spec: MockSessionSpec): TokenmonSnapshot {
       workspace: { current_dir: `~/dev/${spec.project}`, project_dir: `~/dev/${spec.project}` },
       cost: {
         total_cost_usd: spec.cost,
-        total_duration_ms: 45 * MINUTE,
+        total_duration_ms: spec.apiMin * 3 * MINUTE,
+        total_api_duration_ms: spec.apiMin * MINUTE,
         total_lines_added: Math.round(spec.output / 400),
         total_lines_removed: Math.round(spec.output / 2000),
       },
@@ -63,9 +66,10 @@ export function mockTokenmonSnapshots(now: Date = new Date()): TokenmonSnapshot[
       id: "mock-side-project",
       project: "side-project",
       model: "Opus",
-      atMs: t - 10 * MINUTE,
+      atMs: t - 1 * MINUTE,
       input: 182_000,
       output: 24_300,
+      apiMin: 42,
       cost: 1.84,
       ctxPct: 42,
       fiveHour: { pct: 62, resetsAtMs: t + 110 * MINUTE },
@@ -78,6 +82,7 @@ export function mockTokenmonSnapshots(now: Date = new Date()): TokenmonSnapshot[
       atMs: t - 3 * HOUR,
       input: 96_400,
       output: 11_200,
+      apiMin: 18,
       cost: 0.63,
       ctxPct: 18,
     }),
@@ -87,8 +92,9 @@ export function mockTokenmonSnapshots(now: Date = new Date()): TokenmonSnapshot[
       model: "Opus",
       atMs: t - 20 * HOUR,
       input: 241_000,
-      output: 31_800,
-      cost: 2.9,
+      output: 118_000,
+      apiMin: 95,
+      cost: 6.4,
       ctxPct: 55,
     }),
     snapshot({
@@ -96,20 +102,22 @@ export function mockTokenmonSnapshots(now: Date = new Date()): TokenmonSnapshot[
       project: "dotfiles",
       model: "Sonnet",
       atMs: t - 2 * DAY - 2 * HOUR,
-      input: 129_500,
-      output: 14_900,
-      cost: 0.98,
-      ctxPct: 27,
+      input: 42_500,
+      output: 4_800,
+      apiMin: 9,
+      cost: 0.34,
+      ctxPct: 12,
     }),
     snapshot({
       id: "mock-weekend-hack",
       project: "weekend-hack",
       model: "Haiku",
       atMs: t - 2 * DAY - 6 * HOUR,
-      input: 40_200,
-      output: 6_100,
-      cost: 0.12,
-      ctxPct: 9,
+      input: 8_200,
+      output: 900,
+      apiMin: 2,
+      cost: 0.04,
+      ctxPct: 4,
     }),
   ];
 }

@@ -1,9 +1,10 @@
 /**
  * Tokenmon 공용 계약 — Claude Code statusline 수집 스냅샷의 형태와
- * 캐릭터 상태(무드·진화 단계·게이지) 파생 규칙.
+ * 캐릭터 상태 파생 규칙.
  *
  * 스냅샷은 수집기(~/.claude/tokenmon/statusline.js, `npm run setup`으로 설치)가
  * ~/.claude/tokenmon/sessions/<session_id>.json 에 세션당 1개(마지막 상태)로 기록한다.
+ * 세션마다 고유 종족의 캐릭터가 부화해 그 세션의 작업량만큼 자란다.
  * 이 모듈은 순수 함수만 담아 서버·클라이언트 어디서든 임포트할 수 있다.
  */
 
@@ -23,6 +24,7 @@ export interface TokenmonPayload {
   cost?: {
     total_cost_usd?: number | null;
     total_duration_ms?: number | null;
+    total_api_duration_ms?: number | null;
     total_lines_added?: number | null;
     total_lines_removed?: number | null;
   } | null;
@@ -60,8 +62,9 @@ export function parseTokenmonSnapshot(text: string): TokenmonSnapshot | null {
 
 /* ---------- 화면이 쓰는 파생 상태 ---------- */
 
-export type TokenmonMood = "happy" | "content" | "sleepy" | "exhausted" | "sleeping" | "hungry";
+export type TokenmonMood = "happy" | "content" | "sleepy" | "exhausted" | "sleeping";
 export type TokenmonStage = "egg" | "baby" | "pet" | "dragon";
+export type TokenmonSpecies = "sprout" | "ocean" | "star" | "sunset" | "blossom";
 
 export interface TokenmonSession {
   id: string;
@@ -76,6 +79,8 @@ export interface TokenmonSession {
   contextUsedPct: number | null;
   linesAdded: number;
   linesRemoved: number;
+  /** 실제 API 응답에 쓰인 누적 시간(밀리초) — 창을 켜둔 시간이 아니라 일한 시간. */
+  apiDurationMs: number;
 }
 
 export interface TokenmonRateWindow {
@@ -84,21 +89,31 @@ export interface TokenmonRateWindow {
   resetsAtMs: number | null;
 }
 
-export interface TokenmonState {
-  /** true면 실제 수집 데이터, false면 미리보기(mock) 데이터. */
-  live: boolean;
-  /** 최신순 정렬. */
-  sessions: TokenmonSession[];
-  /** 최근 3분 안에 스냅샷이 갱신된 세션 수 = 지금 열려 있는 Claude Code 창 수. */
-  activeSessionCount: number;
-  fiveHour: TokenmonRateWindow | null;
-  sevenDay: TokenmonRateWindow | null;
-  mood: TokenmonMood;
+/** 세션 하나가 키우는 캐릭터. */
+export interface TokenmonPet {
+  session: TokenmonSession;
+  /** 세션 ID 해시로 정해지는 고유 종족. */
+  species: TokenmonSpecies;
   stage: TokenmonStage;
   xp: number;
   /** 현재 단계 안에서의 진행률(0~100). 최종 단계면 100. */
   stageProgressPct: number;
   nextStageXp: number | null;
+  mood: TokenmonMood;
+  /** 최근 3분 안에 스냅샷이 갱신됨 = 창이 지금 열려 있음. */
+  active: boolean;
+}
+
+export interface TokenmonState {
+  /** true면 실제 수집 데이터, false면 미리보기(mock) 데이터. */
+  live: boolean;
+  /** 최신순 정렬. */
+  sessions: TokenmonSession[];
+  /** 세션별 캐릭터 — 깨어 있는 순 → 최신순. */
+  pets: TokenmonPet[];
+  activeSessionCount: number;
+  fiveHour: TokenmonRateWindow | null;
+  sevenDay: TokenmonRateWindow | null;
   lastActivityAt: string | null;
   totals: {
     inputTokens: number;
@@ -109,12 +124,20 @@ export interface TokenmonState {
   };
 }
 
-/** 진화 속도 튜닝값 — 하루 한두 세션 기준으로 첫날 부화, 일주일쯤 아기 졸업, 한 달쯤 코딩 펫 졸업이 되도록 잡았다. */
-export const TOKENMON_STAGE_XP = { baby: 350, pet: 2500, dragon: 8000 } as const;
+/** 세션 내 진화 속도 튜닝값 — 짧은 문답 세션은 알, 한나절 작업 세션은 펫, 대형 세션만 용가리가 되도록 잡았다. */
+export const SESSION_STAGE_XP = { baby: 120, pet: 1200, dragon: 5000 } as const;
 
 const ACTIVE_WINDOW_MS = 3 * 60_000;
-const HUNGRY_AFTER_MS = 6 * 3_600_000;
-const FRESH_ACTIVITY_MS = 30 * 60_000;
+const FRESH_ACTIVITY_MS = 10 * 60_000;
+
+const SPECIES_ORDER: readonly TokenmonSpecies[] = ["sprout", "ocean", "star", "sunset", "blossom"];
+
+/** 세션 ID로 종족을 결정한다 — 같은 세션은 언제나 같은 종족. */
+export function speciesOf(sessionId: string): TokenmonSpecies {
+  let hash = 0;
+  for (let i = 0; i < sessionId.length; i += 1) hash = (hash * 31 + sessionId.charCodeAt(i)) >>> 0;
+  return SPECIES_ORDER[hash % SPECIES_ORDER.length];
+}
 
 function num(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -140,6 +163,7 @@ function toSession(snapshot: TokenmonSnapshot): TokenmonSession {
     contextUsedPct: num(payload.context_window?.used_percentage),
     linesAdded: num(payload.cost?.total_lines_added) ?? 0,
     linesRemoved: num(payload.cost?.total_lines_removed) ?? 0,
+    apiDurationMs: num(payload.cost?.total_api_duration_ms) ?? 0,
   };
 }
 
@@ -161,13 +185,35 @@ function newestWindow(
   return null;
 }
 
-function deriveMood(fiveHour: TokenmonRateWindow | null, lastActivityMs: number | null, nowMs: number): TokenmonMood {
+/** 출력 토큰 + 실제 작업 시간 + 코드 변경량으로 세션 XP를 계산한다. */
+export function sessionXp(session: TokenmonSession): number {
+  return (
+    Math.floor(session.outputTokens / 25) +
+    Math.floor((session.apiDurationMs / 60_000) * 6) +
+    (session.linesAdded + session.linesRemoved) * 2
+  );
+}
+
+function stageOf(xp: number): { stage: TokenmonStage; stageProgressPct: number; nextStageXp: number | null } {
+  const stage: TokenmonStage =
+    xp >= SESSION_STAGE_XP.dragon ? "dragon" : xp >= SESSION_STAGE_XP.pet ? "pet" : xp >= SESSION_STAGE_XP.baby ? "baby" : "egg";
+  const bounds: Record<TokenmonStage, [number, number | null]> = {
+    egg: [0, SESSION_STAGE_XP.baby],
+    baby: [SESSION_STAGE_XP.baby, SESSION_STAGE_XP.pet],
+    pet: [SESSION_STAGE_XP.pet, SESSION_STAGE_XP.dragon],
+    dragon: [SESSION_STAGE_XP.dragon, null],
+  };
+  const [start, end] = bounds[stage];
+  const stageProgressPct = end === null ? 100 : Math.max(0, Math.min(100, Math.round(((xp - start) / (end - start)) * 100)));
+  return { stage, stageProgressPct, nextStageXp: end };
+}
+
+function petMood(active: boolean, fiveHour: TokenmonRateWindow | null, sinceActivityMs: number): TokenmonMood {
+  if (!active) return "sleeping";
   if (fiveHour && fiveHour.usedPct >= 99.5) return "sleeping";
   if (fiveHour && fiveHour.usedPct >= 90) return "exhausted";
   if (fiveHour && fiveHour.usedPct >= 70) return "sleepy";
-  if (lastActivityMs === null || nowMs - lastActivityMs >= HUNGRY_AFTER_MS) return "hungry";
-  if (nowMs - lastActivityMs <= FRESH_ACTIVITY_MS) return "happy";
-  return "content";
+  return sinceActivityMs <= FRESH_ACTIVITY_MS ? "happy" : "content";
 }
 
 export function deriveTokenmonState(snapshots: TokenmonSnapshot[], options: { live: boolean; now?: Date }): TokenmonState {
@@ -177,7 +223,24 @@ export function deriveTokenmonState(snapshots: TokenmonSnapshot[], options: { li
     .sort((a, b) => Date.parse(b.savedAt) - Date.parse(a.savedAt));
   const sessions = sorted.map(toSession);
 
-  const activeSessionCount = sessions.filter((session) => nowMs - Date.parse(session.savedAt) <= ACTIVE_WINDOW_MS).length;
+  const fiveHour = newestWindow(sorted, "five_hour", nowMs);
+
+  const pets = sessions
+    .map((session) => {
+      const active = nowMs - Date.parse(session.savedAt) <= ACTIVE_WINDOW_MS;
+      const xp = sessionXp(session);
+      return {
+        session,
+        species: speciesOf(session.id),
+        xp,
+        ...stageOf(xp),
+        active,
+        mood: petMood(active, fiveHour, nowMs - Date.parse(session.savedAt)),
+      };
+    })
+    .sort((a, b) => Number(b.active) - Number(a.active) || Date.parse(b.session.savedAt) - Date.parse(a.session.savedAt));
+
+  const activeSessionCount = pets.filter((pet) => pet.active).length;
   const lastActivityMs = sessions.length ? Date.parse(sessions[0].savedAt) : null;
 
   const totals = {
@@ -188,32 +251,13 @@ export function deriveTokenmonState(snapshots: TokenmonSnapshot[], options: { li
     activeDays: new Set(sessions.map((session) => new Date(session.savedAt).toDateString())).size,
   };
 
-  const xp = totals.activeDays * 300 + totals.sessionCount * 60 + Math.floor(totals.outputTokens / 500);
-  const stage: TokenmonStage =
-    xp >= TOKENMON_STAGE_XP.dragon ? "dragon" : xp >= TOKENMON_STAGE_XP.pet ? "pet" : xp >= TOKENMON_STAGE_XP.baby ? "baby" : "egg";
-  const bounds: Record<TokenmonStage, [number, number | null]> = {
-    egg: [0, TOKENMON_STAGE_XP.baby],
-    baby: [TOKENMON_STAGE_XP.baby, TOKENMON_STAGE_XP.pet],
-    pet: [TOKENMON_STAGE_XP.pet, TOKENMON_STAGE_XP.dragon],
-    dragon: [TOKENMON_STAGE_XP.dragon, null],
-  };
-  const [stageStart, stageEnd] = bounds[stage];
-  const stageProgressPct =
-    stageEnd === null ? 100 : Math.max(0, Math.min(100, Math.round(((xp - stageStart) / (stageEnd - stageStart)) * 100)));
-
-  const fiveHour = newestWindow(sorted, "five_hour", nowMs);
-
   return {
     live: options.live,
     sessions,
+    pets,
     activeSessionCount,
     fiveHour,
     sevenDay: newestWindow(sorted, "seven_day", nowMs),
-    mood: deriveMood(fiveHour, lastActivityMs, nowMs),
-    stage,
-    xp,
-    stageProgressPct,
-    nextStageXp: stageEnd,
     lastActivityAt: lastActivityMs === null ? null : new Date(lastActivityMs).toISOString(),
     totals,
   };

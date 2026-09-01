@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { TokenmonMood, TokenmonStage } from "@/lib/tokenmon";
+import { formatTokenCount, formatUsd, type TokenmonMood, type TokenmonPet, type TokenmonSpecies, type TokenmonStage } from "@/lib/tokenmon";
 
 /* ---------- 도트 스프라이트 (12×12, '.'은 투명) ---------- */
 
@@ -83,39 +83,41 @@ const DRAGON_GRID = [
   "............",
 ];
 
-const MINION_GRID = [".DDDD.", "DBBBBD", "DEBBED", "DBBBBD", ".DBBD.", "......"];
+/* ---------- 종족 — 세션 ID 해시로 결정되는 5종 ---------- */
 
-const EGG_PALETTE: Palette = { B: "#f0e7d4", S: "#d8c8a2", D: "#b8a87e", C: "#8f8060" };
-const BODY_PALETTE: Palette = {
-  B: "#4c8272",
-  D: "#2f5347",
-  L: "#cfe6da",
-  K: "#d9a0a0",
-  A: "#178a5e",
-  W: "#c8cfc9",
-  T: "#26332e",
-  G: "#58b088",
-  E: "#20201e",
-};
-const DRAGON_PALETTE: Palette = { ...BODY_PALETTE, B: "#3c7a5e", Y: "#d9a55a", G: "#275c4a", A: "#b3701f" };
-
-const SPRITES: Record<TokenmonStage, { grid: string[]; palette: Palette }> = {
-  egg: { grid: EGG_GRID, palette: EGG_PALETTE },
-  baby: { grid: BABY_GRID, palette: BODY_PALETTE },
-  pet: { grid: PET_GRID, palette: BODY_PALETTE },
-  dragon: { grid: DRAGON_GRID, palette: DRAGON_PALETTE },
+const SPECIES_INFO: Record<TokenmonSpecies, { label: string; body: Palette }> = {
+  sprout: { label: "새싹몬", body: { B: "#4c8272", D: "#2f5347", L: "#cfe6da", A: "#178a5e" } },
+  ocean: { label: "바다몬", body: { B: "#4a7d9c", D: "#2e5166", L: "#d3e5ef", A: "#2e6f96" } },
+  star: { label: "별몬", body: { B: "#7a6fa8", D: "#4f4477", L: "#e2ddf0", A: "#6a5a9e" } },
+  sunset: { label: "노을몬", body: { B: "#b07840", D: "#7a4e22", L: "#f0e0cc", A: "#a06a2a" } },
+  blossom: { label: "벚꽃몬", body: { B: "#b06a7e", D: "#7d4353", L: "#f0dde3", A: "#a25a70" } },
 };
 
-const STAGE_LABEL: Record<TokenmonStage, string> = { egg: "알", baby: "아기 클로드", pet: "코딩 펫", dragon: "용가리" };
+const COMMON: Palette = { K: "#d9a0a0", E: "#20201e", W: "#c8cfc9", T: "#26332e" };
+
+function paletteFor(species: TokenmonSpecies, stage: TokenmonStage): Palette {
+  const sp = SPECIES_INFO[species].body;
+  if (stage === "egg") return { B: "#f0e7d4", S: sp.B, D: "#b8a87e", C: "#8f8060" }; // 껍질 반점이 종족색 — 뭐가 나올지 힌트
+  if (stage === "dragon") return { ...COMMON, ...sp, Y: "#d9a55a", G: sp.D, A: "#b3701f" };
+  return { ...COMMON, ...sp, G: sp.A };
+}
+
+function gridFor(stage: TokenmonStage, stageProgressPct: number): string[] {
+  if (stage === "egg") return stageProgressPct >= 60 ? EGG_CRACKED_GRID : EGG_GRID;
+  if (stage === "baby") return BABY_GRID;
+  if (stage === "pet") return PET_GRID;
+  return DRAGON_GRID;
+}
+
+const STAGE_LABEL: Record<TokenmonStage, string> = { egg: "알", baby: "아기", pet: "펫", dragon: "용가리" };
 const STAGE_LEVEL: Record<TokenmonStage, number> = { egg: 1, baby: 2, pet: 3, dragon: 4 };
 
 const SAY_LINES: Record<TokenmonMood, string[]> = {
-  happy: ["오늘도 바이브 코딩 가보자고!", "토큰 냠냠, 순항 중이에요"],
-  content: ["다음 작업을 기다리는 중…", "오늘도 평화로운 코딩 라이프"],
-  sleepy: ["5시간 한도가 차오르고 있어요… 하암", "슬슬 졸린데… 쉬엄쉬엄 해요"],
-  exhausted: ["한도가 거의 다 찼어요… 녹초예요", "리셋까지 조금만 버텨요…"],
-  sleeping: ["한도 리셋을 기다리며 쿨쿨…"],
-  hungry: ["요즘 코딩을 안 하셨네요… 배고파요", "토큰 한 입만 주세요…"],
+  happy: ["바이브 코딩 가보자고!", "토큰 냠냠, 순항 중"],
+  content: ["다음 작업 기다리는 중…", "평화로운 코딩 라이프"],
+  sleepy: ["한도가 차오르고 있어… 하암", "슬슬 졸린데…"],
+  exhausted: ["한도가 거의 다 찼어… 녹초야", "리셋까지 조금만…"],
+  sleeping: ["쿨쿨…"],
 };
 
 type EyeStyle = "open" | "half" | "closed";
@@ -162,23 +164,12 @@ function SpriteSvg({
   );
 }
 
-export function TokenmonPet({
-  stage,
-  mood,
-  xp,
-  nextStageXp,
-  stageProgressPct,
-  activeSessionCount,
-}: {
-  stage: TokenmonStage;
-  mood: TokenmonMood;
-  xp: number;
-  nextStageXp: number | null;
-  stageProgressPct: number;
-  activeSessionCount: number;
-}) {
+/* ---------- 세션 캐릭터 카드 ---------- */
+
+export function TokenmonPetCard({ pet }: { pet: TokenmonPet }) {
   const [blinking, setBlinking] = useState(false);
   const [sayIndex, setSayIndex] = useState(0);
+  const { session, species, stage, mood } = pet;
 
   useEffect(() => {
     if (mood === "sleeping") return;
@@ -200,17 +191,17 @@ export function TokenmonPet({
     return () => clearInterval(timer);
   }, []);
 
-  const sprite = stage === "egg" && stageProgressPct >= 60 ? { grid: EGG_CRACKED_GRID, palette: EGG_PALETTE } : SPRITES[stage];
+  const info = SPECIES_INFO[species];
   const eye: EyeStyle = mood === "sleeping" ? "closed" : blinking ? "closed" : mood === "sleepy" || mood === "exhausted" ? "half" : "open";
   const lines = SAY_LINES[mood];
-  const say = stage === "egg" ? "…(알 속에서 꼬물꼬물)" : lines[sayIndex % lines.length];
-  const minionCount = Math.max(0, activeSessionCount - 1);
-  const label = `토큰몬 — ${STAGE_LABEL[stage]}, 상태: ${mood}`;
+  const say = !pet.active ? "쿨쿨… (지난 세션)" : stage === "egg" ? "…(알 속에서 꼬물꼬물)" : lines[sayIndex % lines.length];
+  const label = `${info.label} — ${STAGE_LABEL[stage]}, ${session.projectName} 세션`;
 
   return (
-    <div className="tm-pet-col">
+    <div className={`tm-pet-card ${pet.active ? "" : "inactive"}`}>
+      {pet.active && <span className="tm-awake" title="지금 열려 있는 세션" />}
       <div className={`tm-sprite-wrap ${mood === "sleeping" ? "tm-breathe" : "tm-bob"}`}>
-        <SpriteSvg grid={sprite.grid} palette={sprite.palette} eye={eye} mood={mood} size={104} label={label} />
+        <SpriteSvg grid={gridFor(stage, pet.stageProgressPct)} palette={paletteFor(species, stage)} eye={eye} mood={mood} size={68} label={label} />
         {mood === "sleeping" && (
           <span className="tm-zzz" aria-hidden>
             💤
@@ -218,33 +209,23 @@ export function TokenmonPet({
         )}
       </div>
       <div className="tm-name">
-        토큰몬 <span className="tm-stage">Lv.{STAGE_LEVEL[stage]} {STAGE_LABEL[stage]}</span>
+        {info.label} <span className="tm-stage">Lv.{STAGE_LEVEL[stage]} {STAGE_LABEL[stage]}</span>
       </div>
-      <p className="tm-say">{say}</p>
+      <p className="tm-card-sub">{session.projectName}</p>
       <div className="tm-xp">
         <div className="tm-xp-track">
-          <div className="tm-xp-fill" style={{ width: `${stageProgressPct}%` }} />
+          <div className="tm-xp-fill" style={{ width: `${pet.stageProgressPct}%` }} />
         </div>
         <p className="tm-xp-label">
-          {nextStageXp === null ? `최종 진화 · XP ${xp.toLocaleString("ko-KR")}` : `다음 진화까지 ${stageProgressPct}% · XP ${xp.toLocaleString("ko-KR")}/${nextStageXp.toLocaleString("ko-KR")}`}
+          {pet.nextStageXp === null
+            ? `최종 진화 · XP ${pet.xp.toLocaleString("ko-KR")}`
+            : `XP ${pet.xp.toLocaleString("ko-KR")}/${pet.nextStageXp.toLocaleString("ko-KR")}`}
         </p>
       </div>
-      {minionCount > 0 && (
-        <div className="tm-minions" title="동시에 열려 있는 Claude Code 창">
-          {Array.from({ length: Math.min(minionCount, 3) }, (_, index) => (
-            <svg key={index} viewBox="0 0 6 6" width={18} height={18} shapeRendering="crispEdges" aria-hidden>
-              {MINION_GRID.map((row, y) =>
-                [...row].map((ch, x) => {
-                  if (ch === ".") return null;
-                  const fill = ch === "E" ? "#20201e" : ch === "D" ? "#2f5347" : "#4c8272";
-                  return <rect key={`${x}-${y}`} x={x} y={y} width={1.03} height={1.03} fill={fill} />;
-                }),
-              )}
-            </svg>
-          ))}
-          <span>동시 작업 창 {activeSessionCount}개</span>
-        </div>
-      )}
+      <p className="tm-card-stats">
+        출력 {formatTokenCount(session.outputTokens)} · {formatUsd(session.costUsd)}
+      </p>
+      <p className="tm-say">{say}</p>
     </div>
   );
 }

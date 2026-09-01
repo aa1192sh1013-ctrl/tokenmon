@@ -4,10 +4,10 @@
 
 Tired of typing `/usage` to check your Claude Code limits? Tokenmon turns your usage into a little creature that lives in a local dashboard:
 
-- **It evolves**: Egg → Baby Claude → Coding Pet → Dragon, fed by your coding activity (active days, sessions, output tokens).
-- **Fatigue gauge** = your 5-hour rate limit. **Life gauge** = your weekly limit. Both with live reset countdowns.
-- At 70% it gets sleepy 😪, at 90% it's exhausted 🥵, at 100% it sleeps 😴 until the window resets.
-- **Real numbers, not just percentages**: per-session token counts (input/output), API-equivalent cost, and how many Claude Code windows you have open right now (they appear as little minions).
+- **Every session hatches its own character**: each Claude Code session gets one of 5 species (picked deterministically from the session id — the egg's speckles hint at the color) and evolves Egg → Baby → Pet → Dragon from that session's actual work. Open windows are awake; closed sessions nap in the roster 💤.
+- **Summary up top**: fatigue gauge = your 5-hour rate limit, life gauge = your weekly limit — both with live reset countdowns — plus per-session token bars and totals.
+- At 70% usage everyone gets sleepy 😪, at 90% exhausted 🥵, at 100% they sleep 😴 until the window resets.
+- **Real numbers, not just percentages**: per-session input/output tokens and API-equivalent cost.
 - A **terminal status line** too: `😊 Tokenmon │ Opus │ 5h ▰▰▱▱ 42% │ wk 22% │ tok 43.9k │ ctx 4% │ $0.44`
 
 Everything runs **100% locally**. No conversation content is ever read or stored — only usage numbers.
@@ -57,16 +57,18 @@ Claude Code pipes session JSON into whatever command is configured as your [stat
 | 5h / weekly usage % and reset times | Absolute subscription limits (Anthropic doesn't publish them) |
 | API-equivalent cost, context usage | |
 
-## Evolution
+## Evolution (per session)
 
 | Stage | XP | Roughly |
 |---|---|---|
-| 🥚 Egg | 0 | day one (it cracks as it gets close to hatching) |
-| 🐣 Baby Claude | 350 | your first day of real use |
-| 🐥 Coding Pet | 2,500 | about a week of regular coding |
-| 🐲 Dragon | 8,000 | a month+ of heavy vibecoding |
+| 🥚 Egg | 0 | a quick question or two (it cracks as it gets close to hatching) |
+| 🐣 Baby | 120 | a few minutes of real work |
+| 🐥 Pet | 1,200 | a solid working session |
+| 🐲 Dragon | 5,000 | a monster all-day session |
 
-XP = active days × 300 + sessions × 60 + output tokens ÷ 500. Deliberately weighted toward *showing up regularly*, not burning tokens.
+Session XP = output tokens ÷ 25 + API minutes × 6 + changed lines × 2 — weighted toward *actual work done in the session*, not leaving a window open.
+
+Species (새싹몬 · 바다몬 · 별몬 · 노을몬 · 벚꽃몬) are assigned by hashing the session id, so every session's character is a small surprise.
 
 ## Uninstall
 

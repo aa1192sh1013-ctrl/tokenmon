@@ -48,9 +48,7 @@ code { padding: 1px 5px; border-radius: 4px; background: var(--soft); font-size:
 .tokenmon-panel { padding: 19px; }
 .tokenmon-panel .panel-heading { margin-bottom: 18px; }
 .tm-sub { margin-left: 7px; color: var(--muted); font-size: 12px; font-weight: 600; }
-.tokenmon-grid { display: grid; align-items: start; grid-template-columns: 172px minmax(0, .95fr) minmax(0, 1.3fr); gap: 26px; }
-
-.tm-pet-col { text-align: center; }
+.tm-summary { display: grid; align-items: start; grid-template-columns: minmax(0, .92fr) minmax(0, 1.3fr); gap: 26px; margin-bottom: 20px; }
 .tm-sprite-wrap { position: relative; display: inline-block; margin-top: 2px; }
 .tm-bob { animation: tm-bob 1.8s steps(2, end) infinite; }
 @keyframes tm-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
@@ -66,7 +64,19 @@ code { padding: 1px 5px; border-radius: 4px; background: var(--soft); font-size:
 .tm-xp-track { overflow: hidden; height: 5px; border-radius: 3px; background: var(--soft); }
 .tm-xp-fill { height: 100%; border-radius: 3px; background: var(--accent); }
 .tm-xp-label { margin: 5px 0 0; color: var(--muted); font-size: 11px; }
-.tm-minions { display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 9px; color: var(--muted); font-size: 11px; }
+.tm-roster-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 0 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+.tm-roster-head h3 { margin: 0; font-size: 13px; }
+.tm-roster-head span { color: var(--muted); font-size: 11px; }
+.tm-roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 10px; }
+.tm-pet-card { position: relative; padding: 12px 10px 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); text-align: center; }
+.tm-pet-card.inactive { opacity: .68; }
+.tm-pet-card .tm-name { margin-top: 5px; font-size: 13px; }
+.tm-pet-card .tm-xp { margin-top: 7px; }
+.tm-pet-card .tm-say { min-height: 16px; font-size: 11px; }
+.tm-awake { position: absolute; top: 9px; right: 10px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.tm-card-sub { overflow: hidden; margin: 2px 0 0; color: var(--muted); font-size: 11px; white-space: nowrap; text-overflow: ellipsis; }
+.tm-card-stats { margin: 6px 0 0; color: var(--ink); font-size: 11px; font-weight: 600; }
+.tm-roster-more { margin: 9px 0 0; color: var(--muted); font-size: 11px; }
 
 .tm-meter { margin-bottom: 14px; }
 .tm-meter-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 12px; }
@@ -118,5 +128,5 @@ code { padding: 1px 5px; border-radius: 4px; background: var(--soft); font-size:
 .tokenmon-standalone { display: grid; place-items: center; min-height: 100vh; padding: 16px; }
 .tokenmon-standalone-inner { width: min(1080px, 100%); }
 
-@media (max-width: 1080px) { .tokenmon-grid { grid-template-columns: 160px minmax(0, 1fr); } .tm-chart-col { grid-column: 1 / -1; } }
-@media (max-width: 560px) { .tokenmon-grid { grid-template-columns: 1fr; } .tm-bar-row { grid-template-columns: 96px minmax(0, 1fr) 44px; } .tm-tip { left: 12px; } }
+@media (max-width: 920px) { .tm-summary { grid-template-columns: 1fr; gap: 18px; } }
+@media (max-width: 560px) { .tm-bar-row { grid-template-columns: 96px minmax(0, 1fr) 44px; } .tm-tip { left: 12px; } }
