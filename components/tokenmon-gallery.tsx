@@ -1,22 +1,21 @@
 "use client";
 
-import { LEVEL_XP, MAX_LEVEL, stageOfLevel, type TokenmonPet, type TokenmonSpecies } from "@/lib/tokenmon";
+import {
+  COMMON_SPECIES_IDS,
+  DINO_SPECIES_IDS,
+  LEVEL_XP,
+  MAX_LEVEL,
+  MYTHIC_SPECIES_IDS,
+  stageOfLevel,
+  type TokenmonPet,
+  type TokenmonSpecies,
+} from "@/lib/tokenmon";
 import { TokenmonPetCard } from "./tokenmon-pet";
 
-/** 도감 — 모든 종족 × 레벨 구간을 가짜 데이터로 미리 본다. */
+/** 도감 — 레벨 성장 미리보기 + 전체 60종. */
 
-const SPECIES_ROWS: { species: TokenmonSpecies; odds: string }[] = [
-  { species: "sunset", odds: "18%" },
-  { species: "star", odds: "18%" },
-  { species: "ocean", odds: "18%" },
-  { species: "blossom", odds: "18%" },
-  { species: "sprout", odds: "18%" },
-  { species: "dino", odds: "5% ✨" },
-  { species: "unicorn", odds: "3% ✨" },
-  { species: "dragonet", odds: "2% ✨" },
-];
-
-const SAMPLE_LEVELS = [1, 5, 10, 17, 20];
+const GROWTH_LEVELS = [1, 2, 3, 5, 7, 9, 11, 13, 15, 17, 20];
+const INDEX_LEVEL = 10;
 
 function samplePet(species: TokenmonSpecies, level: number): TokenmonPet {
   const maxed = level >= MAX_LEVEL;
@@ -42,25 +41,43 @@ function samplePet(species: TokenmonSpecies, level: number): TokenmonPet {
   };
 }
 
+function Section({ title, odds, ids, level }: { title: string; odds: string; ids: readonly string[]; level?: number }) {
+  return (
+    <div className="tm-gallery-row">
+      <p className="tm-gallery-odds">
+        {title} <span>{odds}</span>
+      </p>
+      <div className="tm-roster">
+        {ids.map((species) => (
+          <TokenmonPetCard key={species} pet={samplePet(species, level ?? INDEX_LEVEL)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function TokenmonGallery() {
   return (
     <section className="content-panel tokenmon-panel" aria-label="Tokenmon 도감">
       <div className="panel-heading">
         <h2>
-          도감 <span className="tm-sub">모든 종족 × 레벨 구간</span>
+          도감 <span className="tm-sub">총 {COMMON_SPECIES_IDS.length + DINO_SPECIES_IDS.length + MYTHIC_SPECIES_IDS.length}종</span>
         </h2>
         <p>프로젝트명 뽑기 확률</p>
       </div>
-      {SPECIES_ROWS.map(({ species, odds }) => (
-        <div className="tm-gallery-row" key={species}>
-          <p className="tm-gallery-odds">{odds}</p>
-          <div className="tm-roster">
-            {SAMPLE_LEVELS.map((level) => (
-              <TokenmonPetCard key={`${species}-${level}`} pet={samplePet(species, level)} />
-            ))}
-          </div>
+      <div className="tm-gallery-row">
+        <p className="tm-gallery-odds">
+          레벨 성장 미리보기 <span>레벨마다 몸집과 장식이 늘어나요</span>
+        </p>
+        <div className="tm-roster">
+          {GROWTH_LEVELS.map((level) => (
+            <TokenmonPetCard key={level} pet={samplePet(COMMON_SPECIES_IDS[0], level)} />
+          ))}
         </div>
-      ))}
+      </div>
+      <Section title="흔한 종" odds={`50종 · 각 1.8%`} ids={COMMON_SPECIES_IDS} />
+      <Section title="공룡류 ✨RARE" odds={`5종 · 각 1.2%`} ids={DINO_SPECIES_IDS} level={12} />
+      <Section title="환수종 ✨RARE" odds={`5종 · 각 0.8%`} ids={MYTHIC_SPECIES_IDS} level={12} />
     </section>
   );
 }

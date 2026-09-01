@@ -1,376 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { formatTokenCount, formatUsd, type TokenmonMood, type TokenmonPet, type TokenmonSpecies, type TokenmonStage } from "@/lib/tokenmon";
-
-/* ---------- 도트 스프라이트 (12×12, '.'은 투명) ---------- */
-
-type Palette = Record<string, string>;
-
-const EGG_GRID = [
-  "....DDDD....",
-  "...DBBBBD...",
-  "..DBBSBBBD..",
-  ".DBSBBBBSBD.",
-  ".DBBBBSBBBD.",
-  ".DBSBBBBBBD.",
-  ".DBBBBBBSBD.",
-  ".DBBSBBBBBD.",
-  "..DBBBBBBD..",
-  "...DBBBBD...",
-  "....DDDD....",
-  "............",
-];
-
-/* 부화가 가까워지면(단계 진행 60% 이상) 금이 간 알을 보여준다. */
-const EGG_CRACKED_GRID = [
-  "....DDDD....",
-  "...DBCBBD...",
-  "..DBBCBBBD..",
-  ".DBSBCBBSBD.",
-  ".DBBBBSBBBD.",
-  ".DBSBBBBBBD.",
-  ".DBBBBBBSBD.",
-  ".DBBSBBBBBD.",
-  "..DBBBBBBD..",
-  "...DBBBBD...",
-  "....DDDD....",
-  "............",
-];
-
-/* 꽥꽥봇 — 고무오리 + 안테나·태엽 키·배 화면 */
-const DUCK_BABY = [
-  ".....A......",
-  ".....D......",
-  "...DDDDDD...",
-  "..DBBBBBBD..",
-  ".DBEBBBBEBD.",
-  ".DBOOOOOOBD.",
-  ".DBBOOOOBBD.",
-  ".DKBBBBBBKD.",
-  ".DBBLLLLBBD.",
-  "..DBBBBBBD..",
-  "..DDDDDDDD..",
-  "..OO....OO..",
-];
-const DUCK_ADULT = [
-  ".....A......",
-  ".....D......",
-  "...DDDDDD...",
-  "..DBBBBBBD..",
-  ".DBEBBBBEBD.",
-  ".DBOOOOOOBD.",
-  "WDBBOOOOBBD.",
-  "WDBBLLLLBBD.",
-  ".DBLTGGTLBD.",
-  ".DBBLLLLBBD.",
-  "..DDDDDDDD..",
-  "..OO....OO..",
-];
-
-/* 냥냥봇 — 스틸 고양이 + 수염·가슴 화면 */
-const CAT_BABY = [
-  "..D......D..",
-  ".DPD....DPD.",
-  ".DBBDDDDBBD.",
-  ".DBBBBBBBBD.",
-  ".DBEBBBBEBD.",
-  ".DBBBTTBBBD.",
-  ".DKBBBBBBKD.",
-  ".DBBLLLLBBD.",
-  "..DBBBBBBD..",
-  "...DDDDDD...",
-  "..DD....DD..",
-  "............",
-];
-const CAT_ADULT = [
-  "..D......D..",
-  ".DPD....DPD.",
-  ".DBBDDDDBBD.",
-  ".DBBBBBBBBD.",
-  ".DBEBBBBEBD.",
-  "WDBBBTTBBBDW",
-  "WDKBBBBBBKDW",
-  ".DBLTGGTLBD.",
-  ".DBBLLLLBBD.",
-  "..DBBBBBBD..",
-  ".DDDDDDDDDD.",
-  "..DD....DD..",
-];
-
-/* 펭펭봇 — 네이비 펭귄 + 배 LED·플리퍼 */
-const PENGUIN_BABY = [
-  "....DDDD....",
-  "...DBBBBD...",
-  "..DBBBBBBD..",
-  ".DBELLLLEBD.",
-  ".DBLLOOLLBD.",
-  ".DBBLLLLBBD.",
-  ".DBLLLLLLBD.",
-  ".DBLLLLLLBD.",
-  "..DBLLLLBD..",
-  "..DDDDDDDD..",
-  "..OO....OO..",
-  "............",
-];
-const PENGUIN_ADULT = [
-  "....DDDD....",
-  "...DBBBBD...",
-  "..DBBBBBBD..",
-  ".DBELLLLEBD.",
-  ".DBLLOOLLBD.",
-  "BDBBLLLLBBDB",
-  "BDBLLGGLLBDB",
-  ".DBLLLLLLBD.",
-  "..DBLLLLBD..",
-  "..DDDDDDDD..",
-  "..OO....OO..",
-  "............",
-];
-
-/* 깡총봇 — 분홍 토끼 + 한쪽 귀 안테나 볼 */
-const BUNNY_BABY = [
-  "..DD....DD..",
-  "..DPD..DPD..",
-  "..DPD..DPD..",
-  "..DDDDDDDD..",
-  ".DBBBBBBBBD.",
-  ".DBEBBBBEBD.",
-  ".DBBBTTBBBD.",
-  ".DKBBBBBBKD.",
-  ".DBBLLLLBBD.",
-  "..DBBBBBBD..",
-  "...DDDDDD...",
-  "..DD....DD..",
-];
-const BUNNY_ADULT = [
-  "..AA....DD..",
-  "..DPD..DPD..",
-  "..DPD..DPD..",
-  "..DDDDDDDD..",
-  ".DBBBBBBBBD.",
-  ".DBEBBBBEBD.",
-  ".DBBBTTBBBD.",
-  ".DKBBBBBBKD.",
-  ".DBLTGGTLBD.",
-  ".DBBLLLLBBD.",
-  "..DDDDDDDD..",
-  ".DDD....DDD.",
-];
-
-/* 개굴봇 — 장난감 개구리 + 눈 사이 안테나·배 화면 */
-const FROG_BABY = [
-  ".DDD....DDD.",
-  ".DED....DED.",
-  ".DBBBBBBBBD.",
-  ".DBBBBBBBBD.",
-  ".DKBBBBBBKD.",
-  ".DBDDDDDDBD.",
-  ".DBLLLLLLBD.",
-  ".DBLLLLLLBD.",
-  "..DBLLLLBD..",
-  "..DDDDDDDD..",
-  "..DD....DD..",
-  "............",
-];
-const FROG_ADULT = [
-  ".DDD.AA.DDD.",
-  ".DED.DD.DED.",
-  ".DBBBBBBBBD.",
-  ".DBBBBBBBBD.",
-  ".DKBBBBBBKD.",
-  ".DBDDDDDDBD.",
-  ".DBLLLLLLBD.",
-  ".DBLTGGTLBD.",
-  ".DBLLLLLLBD.",
-  "..DDDDDDDD..",
-  ".DDD....DDD.",
-  "............",
-];
-
-/* 공룡봇 (레어) — 등가시 티라노 + 이빨·LED 배 */
-const DINO_BABY = [
-  "..A..AA..A..",
-  "..DDDDDDDD..",
-  ".DBBBBBBBBD.",
-  ".DBEBBBBEBD.",
-  ".DBBBWWBBBD.",
-  ".DKBBBBBBKD.",
-  ".DBBLLLLBBD.",
-  "..DBBBBBBD..",
-  "..DDDDDDDD..",
-  ".DDD....DDD.",
-  "............",
-  "............",
-];
-const DINO_ADULT = [
-  "..A..AA..A..",
-  "..DDDDDDDD..",
-  ".DBBBBBBBBD.",
-  ".DBEBBBBEBD.",
-  ".DBBBWWBBBD.",
-  ".DKBBBBBBKD.",
-  "DDBBLLLLBBDD",
-  ".DBLLLLLLBD.",
-  ".DBLLGGLLBD.",
-  "..DBBBBBBD..",
-  "..DDDDDDDD..",
-  ".DDD....DDD.",
-];
-
-/* 유니뿅 (레어) — 뿔 + 옆갈기 유니콘 */
-const UNICORN_BABY = [
-  ".....A......",
-  "..MDDDDDD...",
-  ".MDBBBBBBD..",
-  ".MDBEBBEBD..",
-  "..DBBBBBBD..",
-  ".DKBBBBBBKD.",
-  ".DBBLLLLBBD.",
-  "..DBBBBBBD..",
-  "...DDDDDD...",
-  "..DD....DD..",
-  "............",
-  "............",
-];
-const UNICORN_ADULT = [
-  ".....A......",
-  ".....A......",
-  "..MDDDDDD...",
-  ".MDBBBBBBD..",
-  ".MDBEBBEBD..",
-  "..DBBBBBBD..",
-  ".DBBBTTBBBD.",
-  ".DKBBBBBBKD.",
-  ".DBBLLLLBBD.",
-  "..DBBBBBBD..",
-  "...DDDDDD...",
-  "..DD....DD..",
-];
-
-/* 용용봇 (레어) — 뿔·송곳니·날개 아기용 */
-const DRAGONET_BABY = [
-  "..A......A..",
-  ".DAD....DAD.",
-  ".DBBDDDDBBD.",
-  ".DBBBBBBBBD.",
-  ".DBEBBBBEBD.",
-  ".DBBWBBWBBD.",
-  ".DKBBBBBBKD.",
-  ".DBLYYYYLBD.",
-  "..DBBBBBBD..",
-  "..DD....DD..",
-  "............",
-  "............",
-];
-const DRAGONET_ADULT = [
-  "..A......A..",
-  ".DAD....DAD.",
-  ".DBBDDDDBBD.",
-  ".DBBBBBBBBD.",
-  ".DBEBBBBEBD.",
-  ".DBBWBBWBBD.",
-  "GDKBBBBBBKDG",
-  "GDBLYYYYLBDG",
-  ".DBLYYYYLBD.",
-  "..DBBBBBBD..",
-  "..DD.DD.DD..",
-  "............",
-];
-
-/* ---------- 종족 — 세션 ID 해시로 결정 (흔한 5종 + 레어 3종) ---------- */
-
-interface SpeciesDef {
-  label: string;
-  cry: string;
-  baby: string[];
-  adult: string[];
-  colors: Palette;
-  /** 알 반점 색 — 몸색이 너무 연한 종족용 힌트 색. */
-  hint?: string;
-  rare?: boolean;
-}
-
-const SPECIES_INFO: Record<TokenmonSpecies, SpeciesDef> = {
-  sunset: {
-    label: "꽥꽥봇",
-    cry: "꽥!",
-    baby: DUCK_BABY,
-    adult: DUCK_ADULT,
-    colors: { B: "#e3bd4a", D: "#96762a", L: "#f7ecc8", O: "#d97b2f", A: "#d95f5f" },
-  },
-  star: {
-    label: "냥냥봇",
-    cry: "냥!",
-    baby: CAT_BABY,
-    adult: CAT_ADULT,
-    colors: { B: "#8a93a8", D: "#545c70", L: "#e8ebf2", P: "#e8b7c5", T: "#3a3f4a", A: "#d95f5f" },
-  },
-  ocean: {
-    label: "펭펭봇",
-    cry: "펭!",
-    baby: PENGUIN_BABY,
-    adult: PENGUIN_ADULT,
-    colors: { B: "#46536e", D: "#2c3548", L: "#f0f3f0", O: "#d97b2f", A: "#d95f5f" },
-  },
-  blossom: {
-    label: "깡총봇",
-    cry: "깡총!",
-    baby: BUNNY_BABY,
-    adult: BUNNY_ADULT,
-    colors: { B: "#d9a8b5", D: "#9c6a79", L: "#f7e6ec", P: "#f2d3dc", T: "#6e4a55", A: "#58b0d0" },
-  },
-  sprout: {
-    label: "개굴봇",
-    cry: "개굴!",
-    baby: FROG_BABY,
-    adult: FROG_ADULT,
-    colors: { B: "#7fae5e", D: "#4f7038", L: "#e9f2d8", A: "#d95f5f" },
-  },
-  dino: {
-    label: "공룡봇",
-    cry: "쿠앙!",
-    rare: true,
-    baby: DINO_BABY,
-    adult: DINO_ADULT,
-    colors: { B: "#4f9e8a", D: "#2f6355", L: "#d8ede5", A: "#d97b2f" },
-  },
-  unicorn: {
-    label: "유니뿅",
-    cry: "뿅!",
-    rare: true,
-    baby: UNICORN_BABY,
-    adult: UNICORN_ADULT,
-    hint: "#e88ab0",
-    colors: { B: "#eef0f4", D: "#8a90a5", L: "#fce8ef", M: "#e88ab0", T: "#b58aa5", A: "#dfae3c" },
-  },
-  dragonet: {
-    label: "용용봇",
-    cry: "크앙!",
-    rare: true,
-    baby: DRAGONET_BABY,
-    adult: DRAGONET_ADULT,
-    colors: { B: "#c56a5a", D: "#7e4238", L: "#f2ded8", Y: "#e8c078", G: "#8a4a3e", A: "#dfae3c" },
-  },
-};
-
-/* 공통 부품색 — 리벳(K)·태엽/수염(W)·화면(T)·LED(G) */
-const COMMON: Palette = { E: "#20201e", K: "#9aa5a8", W: "#d5d9d5", T: "#26332e", G: "#58d08a" };
-const GOLD = "#dfae3c";
-
-function paletteFor(species: TokenmonSpecies, stage: TokenmonStage): Palette {
-  const info = SPECIES_INFO[species];
-  if (stage === "egg") return { B: "#f0e7d4", S: info.hint ?? info.colors.B, D: "#b8a87e", C: "#8f8060" }; // 껍질 반점이 종족색 — 뭐가 나올지 힌트
-  const base = { ...COMMON, ...info.colors };
-  if (stage === "dragon") return { ...base, A: GOLD, G: GOLD, K: GOLD }; // 황금킹 — 금장 트림
-  return base;
-}
-
-function gridFor(species: TokenmonSpecies, stage: TokenmonStage, stageProgressPct: number): string[] {
-  if (stage === "egg") return stageProgressPct >= 60 ? EGG_CRACKED_GRID : EGG_GRID;
-  if (stage === "baby") return SPECIES_INFO[species].baby;
-  return SPECIES_INFO[species].adult; // 어른·황금킹은 같은 몸, 황금킹은 금장+반짝이
-}
+import { useEffect, useState, type ReactNode } from "react";
+import { formatTokenCount, formatUsd, type TokenmonMood, type TokenmonPet, type TokenmonStage } from "@/lib/tokenmon";
+import { GOLD, getSpeciesInfo, gridFor, paletteFor, type Palette } from "./tokenmon-species";
 
 const STAGE_LABEL: Record<TokenmonStage, string> = { egg: "알", baby: "아기", pet: "어른", dragon: "황금킹" };
 
@@ -400,22 +32,97 @@ function Sparkle({ cx, cy, size }: { cx: number; cy: number; size: number }) {
   );
 }
 
+const SPARKLE_SPOTS: [number, number, number][] = [
+  [1.3, 1.2, 1.5],
+  [11, 6.2, 1.1],
+  [10.6, 1.8, 1],
+  [0.9, 8.8, 1],
+  [6, 11.2, 0.9],
+  [11.2, 10.6, 0.9],
+];
+
+/** 레벨 장비 사다리 — 레벨이 오를 때마다 장식이 하나씩 누적된다. */
+function levelGear(level: number): ReactNode[] {
+  const items: ReactNode[] = [];
+  if (level >= 3)
+    items.push(
+      <rect key="c1" x={2.2} y={6.15} width={0.55} height={0.55} fill="#e88ab0" />,
+      <rect key="c2" x={9.25} y={6.15} width={0.55} height={0.55} fill="#e88ab0" />,
+    );
+  if (level >= 4) items.push(<rect key="ant" x={5.7} y={0.05} width={0.6} height={0.6} fill="#d95f5f" />);
+  if (level >= 5)
+    items.push(
+      <rect key="s1" x={5.55} y={7.25} width={0.9} height={0.32} fill={GOLD} />,
+      <rect key="s2" x={5.84} y={6.96} width={0.32} height={0.9} fill={GOLD} />,
+    );
+  if (level >= 6)
+    items.push(
+      <rect key="sh1" x={2.7} y={10.7} width={1.7} height={0.55} fill="#33363e" />,
+      <rect key="sh2" x={7.6} y={10.7} width={1.7} height={0.55} fill="#33363e" />,
+    );
+  if (level >= 7) items.push(<rect key="scarf" x={3.1} y={7.05} width={5.8} height={0.55} fill="#d95f5f" opacity={0.85} />);
+  if (level >= 9)
+    items.push(
+      <rect key="b1" x={0.85} y={6.35} width={0.55} height={0.55} fill="#9aa5a8" />,
+      <rect key="b2" x={10.6} y={6.35} width={0.55} height={0.55} fill="#9aa5a8" />,
+    );
+  if (level >= 10) items.push(<rect key="led" x={5.75} y={8.5} width={0.5} height={0.5} fill="#58d08a" />);
+  if (level >= 11) items.push(<rect key="band" x={2.6} y={1.75} width={6.8} height={0.5} fill="#58b0d0" opacity={0.9} />);
+  if (level >= 12)
+    items.push(
+      <rect key="bw1" x={1.95} y={0.95} width={0.6} height={0.6} fill="#e88ab0" />,
+      <rect key="bw2" x={2.75} y={0.95} width={0.6} height={0.6} fill="#e88ab0" />,
+      <rect key="bw3" x={2.4} y={1.4} width={0.5} height={0.5} fill="#d96a8c" />,
+    );
+  if (level >= 13)
+    items.push(
+      <rect key="g1" x={6.7} y={7.55} width={1.1} height={0.36} fill={GOLD} />,
+      <rect key="g2" x={7.07} y={7.18} width={0.36} height={1.1} fill={GOLD} />,
+    );
+  if (level >= 14)
+    items.push(
+      ...[
+        [0.7, 0.7],
+        [11, 0.7],
+        [0.7, 10.9],
+        [11, 10.9],
+      ].map(([x, y], index) => <rect key={`au${index}`} x={x} y={y} width={0.45} height={0.45} fill={GOLD} opacity={0.7} />),
+    );
+  if (level >= 20)
+    items.push(
+      <rect key="cr0" x={4.3} y={0.75} width={3.4} height={0.7} fill={GOLD} />,
+      <rect key="cr1" x={4.3} y={0.1} width={0.75} height={0.75} fill={GOLD} />,
+      <rect key="cr2" x={5.63} y={0.1} width={0.75} height={0.75} fill={GOLD} />,
+      <rect key="cr3" x={6.95} y={0.1} width={0.75} height={0.75} fill={GOLD} />,
+    );
+  return items;
+}
+
+/** 레벨마다 몸집도 조금씩 자란다. */
+function spriteSize(level: number, stage: TokenmonStage): number {
+  if (stage === "egg") return 46;
+  return Math.round(Math.min(74, 44 + level * 1.5));
+}
+
 function SpriteSvg({
   grid,
   palette,
   eye,
-  golden,
+  level,
+  stage,
   size,
   label,
 }: {
   grid: string[];
   palette: Palette;
   eye: EyeStyle;
-  golden: boolean;
+  level: number;
+  stage: TokenmonStage;
   size: number;
   label: string;
 }) {
   const cells = grid.length;
+  const sparkles = stage === "dragon" ? Math.max(0, Math.min(SPARKLE_SPOTS.length, level - 14)) : 0;
   return (
     <svg viewBox={`0 0 ${cells} ${cells}`} width={size} height={size} shapeRendering="crispEdges" role="img" aria-label={label}>
       {grid.map((row, y) =>
@@ -426,17 +133,15 @@ function SpriteSvg({
           return fill ? <rect key={`${x}-${y}`} x={x} y={y} width={1.03} height={1.03} fill={fill} /> : null;
         }),
       )}
-      {golden && (
-        <>
-          <Sparkle cx={1.3} cy={1.2} size={1.5} />
-          <Sparkle cx={11} cy={6.2} size={1.1} />
-        </>
-      )}
+      {stage !== "egg" && levelGear(level)}
+      {SPARKLE_SPOTS.slice(0, sparkles).map(([cx, cy, s], index) => (
+        <Sparkle key={`sp${index}`} cx={cx} cy={cy} size={s} />
+      ))}
     </svg>
   );
 }
 
-/* ---------- 세션 캐릭터 카드 ---------- */
+/* ---------- 프로젝트 캐릭터 카드 ---------- */
 
 export function TokenmonPetCard({ pet }: { pet: TokenmonPet }) {
   const [blinking, setBlinking] = useState(false);
@@ -463,7 +168,7 @@ export function TokenmonPetCard({ pet }: { pet: TokenmonPet }) {
     return () => clearInterval(timer);
   }, []);
 
-  const info = SPECIES_INFO[species];
+  const info = getSpeciesInfo(species);
   const eye: EyeStyle = mood === "sleeping" ? "closed" : blinking ? "closed" : mood === "starving" ? "half" : "open";
   const lines = SAY_LINES[mood];
   const line = lines[sayIndex % lines.length];
@@ -488,8 +193,9 @@ export function TokenmonPetCard({ pet }: { pet: TokenmonPet }) {
           grid={gridFor(species, stage, pet.levelProgressPct)}
           palette={paletteFor(species, stage)}
           eye={eye}
-          golden={stage === "dragon"}
-          size={68}
+          level={pet.level}
+          stage={stage}
+          size={spriteSize(pet.level, stage)}
           label={label}
         />
         {mood === "sleeping" && (

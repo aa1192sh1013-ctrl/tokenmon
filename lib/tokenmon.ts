@@ -66,7 +66,26 @@ export function parseTokenmonSnapshot(text: string): TokenmonSnapshot | null {
 
 export type TokenmonMood = "happy" | "content" | "sleeping" | "starving";
 export type TokenmonStage = "egg" | "baby" | "pet" | "dragon";
-export type TokenmonSpecies = "sprout" | "ocean" | "star" | "sunset" | "blossom" | "dino" | "unicorn" | "dragonet";
+/** 종 ID — 흔한 종은 `${과}-${색상}`(예: "duck-lemon"), 레어는 고유 ID(예: "tyranno"). */
+export type TokenmonSpecies = string;
+
+/** 공통 과(科)와 색상 변종 키 — 조합이 흔한 종 50가지가 된다 (10과 × 색상 5종). */
+export const SPECIES_FAMILY_KEYS = ["duck", "cat", "penguin", "bunny", "frog", "bear", "chick", "pig", "owl", "turtle"] as const;
+export const SPECIES_PALETTE_KEYS = ["lemon", "strawberry", "mint", "sky", "grape", "cocoa", "lime", "peach", "snow", "charcoal"] as const;
+
+/** 과마다 색상 5종씩 회전 배정 — 흔한 종 50가지. */
+export const COMMON_SPECIES_IDS: readonly string[] = SPECIES_FAMILY_KEYS.flatMap((family, index) =>
+  [0, 2, 4, 6, 8].map((offset) => `${family}-${SPECIES_PALETTE_KEYS[(index + offset) % SPECIES_PALETTE_KEYS.length]}`),
+);
+export const DINO_SPECIES_IDS: readonly string[] = ["tyranno", "tricera", "stego", "brachio", "ptera"];
+export const MYTHIC_SPECIES_IDS: readonly string[] = ["unicorn", "dragonet", "phoenix", "gumiho", "pegasus"];
+export const RARE_SPECIES: readonly string[] = [...DINO_SPECIES_IDS, ...MYTHIC_SPECIES_IDS];
+
+export function parseSpeciesId(id: string): { family: string; palette: string } | null {
+  const dash = id.lastIndexOf("-");
+  if (dash <= 0) return null;
+  return { family: id.slice(0, dash), palette: id.slice(dash + 1) };
+}
 
 export interface TokenmonSession {
   id: string;
@@ -183,26 +202,14 @@ const FRESH_ACTIVITY_MS = 10 * 60_000;
 const HUNGER_GRACE_DAYS = 3;
 const HUNGER_DECAY_PER_DAY = 0.03;
 
-/** 종족 뽑기표(1000분율) — 흔한 5종 각 18%, 레어: 공룡봇 5% · 유니뿅 3% · 용용봇 2%. */
-const SPECIES_TABLE: readonly { species: TokenmonSpecies; upTo: number }[] = [
-  { species: "sunset", upTo: 180 },
-  { species: "star", upTo: 360 },
-  { species: "ocean", upTo: 540 },
-  { species: "blossom", upTo: 720 },
-  { species: "sprout", upTo: 900 },
-  { species: "dino", upTo: 950 },
-  { species: "unicorn", upTo: 980 },
-  { species: "dragonet", upTo: 1000 },
-];
-
-export const RARE_SPECIES: readonly TokenmonSpecies[] = ["dino", "unicorn", "dragonet"];
-
-/** 세션 ID로 종족을 결정한다 — 같은 세션은 언제나 같은 종족. */
-export function speciesOf(sessionId: string): TokenmonSpecies {
+/** 종족 뽑기(1000분율) — 흔한 50종 각 1.8%, 공룡류 5종 각 1.2%, 환수종 5종 각 0.8%. 프로젝트명이 같으면 언제나 같은 종. */
+export function speciesOf(projectName: string): TokenmonSpecies {
   let hash = 0;
-  for (let i = 0; i < sessionId.length; i += 1) hash = (hash * 31 + sessionId.charCodeAt(i)) >>> 0;
+  for (let i = 0; i < projectName.length; i += 1) hash = (hash * 31 + projectName.charCodeAt(i)) >>> 0;
   const roll = hash % 1000;
-  return (SPECIES_TABLE.find((row) => roll < row.upTo) ?? SPECIES_TABLE[0]).species;
+  if (roll < 900) return COMMON_SPECIES_IDS[roll % COMMON_SPECIES_IDS.length];
+  if (roll < 960) return DINO_SPECIES_IDS[(roll - 900) % DINO_SPECIES_IDS.length];
+  return MYTHIC_SPECIES_IDS[(roll - 960) % MYTHIC_SPECIES_IDS.length];
 }
 
 function num(value: unknown): number | null {

@@ -79,8 +79,9 @@ code { padding: 1px 5px; border-radius: 4px; background: var(--soft); font-size:
 .tm-card-sub { overflow: hidden; margin: 2px 0 0; color: var(--muted); font-size: 11px; white-space: nowrap; text-overflow: ellipsis; }
 .tm-card-stats { margin: 6px 0 0; color: var(--ink); font-size: 11px; font-weight: 600; }
 .tm-roster-more { margin: 9px 0 0; color: var(--muted); font-size: 11px; }
-.tm-gallery-row { margin-bottom: 18px; }
-.tm-gallery-odds { margin: 0 0 6px; color: var(--muted); font-size: 11px; font-weight: 700; }
+.tm-gallery-row { margin-bottom: 20px; }
+.tm-gallery-odds { margin: 0 0 8px; color: var(--ink); font-size: 12px; font-weight: 750; }
+.tm-gallery-odds span { margin-left: 6px; color: var(--muted); font-weight: 600; font-size: 11px; }
 .tm-open-link { color: var(--muted); font-weight: 600; }
 .tm-open-link:hover { color: var(--ink); }
 
