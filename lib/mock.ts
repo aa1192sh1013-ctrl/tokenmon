@@ -38,7 +38,8 @@ function snapshot(spec: MockSessionSpec): TokenmonSnapshot {
         total_lines_removed: Math.round(spec.output / 2000),
       },
       context_window: {
-        total_input_tokens: spec.output * 8,
+        // 실사용에서 입력(캐시 포함)은 출력의 수백 배 규모다 — XP(총 토큰 기준)가 그럴듯하게 나오게 맞춘다
+        total_input_tokens: spec.output * 350,
         total_output_tokens: spec.output,
         context_window_size: 200_000,
         used_percentage: spec.ctxPct,
@@ -61,31 +62,31 @@ function snapshot(spec: MockSessionSpec): TokenmonSnapshot {
 export function mockTokenmonSnapshots(now: Date = new Date()): TokenmonSnapshot[] {
   const t = now.getTime();
   return [
-    // side-project → 개굴봇 Lv.1 (부화 임박한 알, 지금 작업 중)
+    // side-project → Lv.1 부화 임박한 알 (약 30 XP, 지금 작업 중)
     snapshot({
       id: "mock-a1",
       project: "side-project",
       model: "Opus",
       atMs: t - 1 * MINUTE,
-      output: 1_400,
+      output: 86_000,
       apiMin: 3,
       cost: 0.21,
       ctxPct: 9,
       fiveHour: { pct: 62, resetsAtMs: t + 110 * MINUTE },
       sevenDay: { pct: 38, resetsAtMs: t + 2.8 * DAY },
     }),
-    // hoppy-notes → 깡총봇 Lv.5 아기
-    snapshot({ id: "mock-b1", project: "hoppy-notes", model: "Haiku", atMs: t - 3 * DAY, output: 11_000, apiMin: 12, cost: 0.35, ctxPct: 8 }),
-    // api-server → 펭펭봇 Lv.8 어른
-    snapshot({ id: "mock-c1", project: "api-server", model: "Sonnet", atMs: t - 2 * DAY, output: 45_000, apiMin: 30, cost: 2.4, ctxPct: 21 }),
-    // web-app → 냥냥봇 Lv.10 어른
-    snapshot({ id: "mock-d1", project: "web-app", model: "Opus", atMs: t - 5 * HOUR, output: 120_000, apiMin: 60, cost: 9.8, ctxPct: 44 }),
-    // neon-garden → 공룡봇 ✨RARE Lv.16 황금킹
-    snapshot({ id: "mock-e1", project: "neon-garden", model: "Opus", atMs: t - 1 * DAY, output: 1_200_000, apiMin: 150, cost: 84, ctxPct: 61 }),
-    snapshot({ id: "mock-e2", project: "neon-garden", model: "Sonnet", atMs: t - 4 * DAY, output: 720_000, apiMin: 120, cost: 41, ctxPct: 37 }),
-    // night-shift → 꽥꽥봇 Lv.20 👑MAX (한 달 갈아넣은 프로젝트)
-    snapshot({ id: "mock-f1", project: "night-shift", model: "Opus", atMs: t - 20 * HOUR, output: 4_800_000, apiMin: 280, cost: 320, ctxPct: 72 }),
-    snapshot({ id: "mock-f2", project: "night-shift", model: "Opus", atMs: t - 3 * DAY, output: 4_200_000, apiMin: 300, cost: 288, ctxPct: 68 }),
-    snapshot({ id: "mock-f3", project: "night-shift", model: "Sonnet", atMs: t - 6 * DAY, output: 2_600_000, apiMin: 240, cost: 96, ctxPct: 55 }),
+    // hoppy-notes → Lv.5 (약 228 XP)
+    snapshot({ id: "mock-b1", project: "hoppy-notes", model: "Haiku", atMs: t - 3 * DAY, output: 650_000, apiMin: 12, cost: 0.35, ctxPct: 8 }),
+    // api-server → Lv.8 (약 540 XP)
+    snapshot({ id: "mock-c1", project: "api-server", model: "Sonnet", atMs: t - 2 * DAY, output: 1_540_000, apiMin: 30, cost: 2.4, ctxPct: 21 }),
+    // web-app → Lv.10 (약 850 XP)
+    snapshot({ id: "mock-d1", project: "web-app", model: "Opus", atMs: t - 5 * HOUR, output: 2_420_000, apiMin: 60, cost: 9.8, ctxPct: 44 }),
+    // neon-garden → Lv.16 (약 2,900 XP)
+    snapshot({ id: "mock-e1", project: "neon-garden", model: "Opus", atMs: t - 1 * DAY, output: 5_200_000, apiMin: 150, cost: 84, ctxPct: 61 }),
+    snapshot({ id: "mock-e2", project: "neon-garden", model: "Sonnet", atMs: t - 4 * DAY, output: 3_060_000, apiMin: 120, cost: 41, ctxPct: 37 }),
+    // night-shift → Lv.20 👑MAX (약 6,200 XP — 몇 달 갈아넣은 프로젝트)
+    snapshot({ id: "mock-f1", project: "night-shift", model: "Opus", atMs: t - 20 * HOUR, output: 7_400_000, apiMin: 280, cost: 320, ctxPct: 72 }),
+    snapshot({ id: "mock-f2", project: "night-shift", model: "Opus", atMs: t - 3 * DAY, output: 6_300_000, apiMin: 300, cost: 288, ctxPct: 68 }),
+    snapshot({ id: "mock-f3", project: "night-shift", model: "Sonnet", atMs: t - 6 * DAY, output: 4_000_000, apiMin: 240, cost: 96, ctxPct: 55 }),
   ];
 }

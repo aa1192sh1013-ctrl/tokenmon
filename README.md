@@ -5,7 +5,7 @@
 Tired of typing `/usage` to check your Claude Code limits? Tokenmon turns your usage into a little creature that lives in a local dashboard:
 
 - **Every project raises its own mecha companion**: each project rolls one of **60 distinct animal-mecha species** — 50 commons (mammals, predators, birds, reptiles, fish, sea creatures) plus 10 rares ✨ (5 dinos, 5 mythical beasts) — and separately rolls one of **12 colors** (red/orange/yellow/green/blue/indigo/violet/white/black/gold/silver/bronze), both deterministically from the project name. Every character carries robot hardware: a chest core plate with a glowing power core, panel seams, shoulder bolts, and tech-glow eyes. Projects you're working on right now are awake; the rest go into power-save 💤. Browse them all at `/gallery`.
-- **Lv.1–20, no stage classes — just continuous growth**: Lv.1 is an incubator egg; from Lv.2 your mecha grows bigger every level and earns robot upgrades (ear chips → antenna → core ring → booster feet → shoulder armor → arm bands → core overcharge → visor → wing jets → gold emblem → energy particles → golden aura at 15 → a cape at 18 → the crown at 👑Lv.20 MAX, 500k XP — about a month of unhinged daily usage).
+- **Lv.1–20, no stage classes — just continuous growth**: Lv.1 is an incubator egg; from Lv.2 your mecha grows bigger every level and earns robot upgrades (ear chips → antenna → core ring → booster feet → shoulder armor → arm bands → core overcharge → visor → wing jets → gold emblem → energy particles → golden aura at 15 → a cape at 18 → the crown at 👑Lv.20 MAX, 5,700 XP ≈ 5.7B total tokens — months of unhinged daily usage).
 - **Don't waste what you already paid for**: the 5-hour bowl and weekly bucket gauges show how much of your subscription capacity you've actually eaten — whatever's left at reset **evaporates** 💸. The panel counts down to the next evaporation and reports how much you wasted last window.
 - **Neglect has consequences**: leave a project untouched for 3+ days and its character starts starving 🥀 — XP withers ~3% a day and levels can drop — until one session restores it in full. Skip a day and your streak 🔥 is gone.
 - **Real numbers, not just percentages**: per-session output tokens up front; input (cache included) and cost in the table.
@@ -37,7 +37,7 @@ Then open a new Claude Code session anywhere and do anything — your Tokenmon h
 npm run backfill
 ```
 
-It scans your local `~/.claude/projects` transcripts and aggregates **numbers only** (tokens, timestamps — conversation content is never stored) into one history summary per project, so your characters instantly reflect your real track record. Safe to re-run any time: summaries are overwritten and live-collected sessions are never double-counted. History XP counts output tokens only (÷25), since API minutes and changed lines aren't recorded in transcripts.
+It scans your local `~/.claude/projects` transcripts and aggregates **numbers only** (tokens, timestamps — conversation content is never stored) into one history summary per project, so your characters instantly reflect your real track record. Safe to re-run any time: summaries are overwritten and live-collected sessions are never double-counted.
 
 **Keeping the ranch tidy**: sessions started in your home directory, Desktop/Downloads/Documents, or anywhere under the OS temp folder never hatch characters (their usage still counts in the totals). To exclude more by name, create `~/.claude/tokenmon/config.json`:
 
@@ -74,7 +74,7 @@ Claude Code pipes session JSON into whatever command is configured as your [stat
 
 ## Leveling (per project)
 
-XP = output tokens ÷ 25 + API minutes × 6 + changed lines × 2, summed over every session in the project — weighted toward *actual work*, not leaving a window open. Each level costs ~1.6× the previous one (120, 190, 300, 480, 760, 1.2k, … 300k, **500k at Lv.20**). Calibrated against real `ccusage` data from a certifiable daily heavy user: Lv.20 takes about a month of hard daily grinding; casual use takes about a year.
+**1 XP = 1,000,000 total tokens** (input + cache + output — the same unit as `ccusage`'s Total Tokens column), summed over every session in the project. The curve is gentle (~1.2× per level: 37, 44, 53, 64, … 814, ~1,000) and tops out at **5,700 XP ≈ 5.7B total tokens for Lv.20** — calibrated against real `ccusage` data from a certifiable daily heavy user: months of hard daily grinding on a single project.
 
 ## Species gacha — 60 to collect × 12 colors
 
@@ -97,7 +97,7 @@ Timestamped backups of `settings.json` are left in `~/.claude/`.
 
 ## 한국어
 
-Claude Code 사용량으로 키우는 토큰 다마고치예요. 5시간 한도가 차면 졸려하고, 다 차면 리셋까지 잠들어요. 코딩한 만큼 알 → 아기 클로드 → 코딩 펫 → 용가리로 진화합니다. 전부 로컬에서만 돌고 대화 내용은 절대 수집하지 않아요. `npm run setup` 한 번이면 연결 끝!
+Claude Code 사용량으로 키우는 토큰 다마고치예요. 프로젝트 폴더마다 메카 동물 캐릭터가 한 마리씩 부화해서(60종 × 12색 랜덤), 총 토큰 100만 개당 1 XP로 Lv.20까지 자랍니다. 레벨마다 장비가 늘고, 3일 넘게 방치하면 굶어서 XP가 마르고, 5시간 밥그릇을 안 비우면 그만큼 증발해요. 전부 로컬에서만 돌고 대화 내용은 절대 수집하지 않아요. `npm run setup` 한 번이면 연결 끝!
 
 ## License
 

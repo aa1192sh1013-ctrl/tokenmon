@@ -21,8 +21,8 @@ const readline = require("readline");
 const PROJECTS_DIR = path.join(os.homedir(), ".claude", "projects");
 const SESSIONS_DIR = path.join(os.homedir(), ".claude", "tokenmon", "sessions");
 
-/* lib/tokenmon.ts 의 LEVEL_XP와 같은 값 — 리포트 출력용 사본 */
-const LEVEL_XP = [0, 0, 120, 190, 300, 480, 760, 1200, 1900, 3000, 4800, 7600, 12000, 19000, 30000, 48000, 76000, 120000, 190000, 300000, 500000];
+/* lib/tokenmon.ts 의 LEVEL_XP와 같은 값 — 리포트 출력용 사본 (1 XP = 총 토큰 100만) */
+const LEVEL_XP = [0, 0, 37, 81, 134, 198, 274, 366, 476, 608, 766, 956, 1183, 1456, 1783, 2176, 2647, 3212, 3891, 4705, 5700];
 
 function levelOf(xp) {
   for (let level = 20; level >= 2; level -= 1) if (xp >= LEVEL_XP[level]) return level;
@@ -139,9 +139,10 @@ async function main() {
     };
     fs.writeFileSync(path.join(SESSIONS_DIR, sanitize("backfill-" + entry.name) + ".json"), JSON.stringify(body));
 
-    const xp = Math.floor(agg.output / 25);
+    const totalTokens = agg.input + agg.cacheCreate + agg.cacheRead + agg.output;
+    const xp = totalTokens / 1e6; // 1 XP = 총 토큰(캐시 포함) 100만
     const skippedNote = agg.skipped ? ` · 라이브 수집 ${agg.skipped}개 제외` : "";
-    console.log(`✓ ${basename(projectDir)} — 세션 ${agg.sessions}개, 출력 ${fmt(agg.output)} 토큰 → 약 ${fmt(xp)} XP (Lv.${levelOf(xp)})${skippedNote}`);
+    console.log(`✓ ${basename(projectDir)} — 세션 ${agg.sessions}개, 총 ${fmt(totalTokens)} 토큰 → 약 ${xp.toFixed(1)} XP (Lv.${levelOf(xp)})${skippedNote}`);
     grandOutput += agg.output;
     grandSessions += agg.sessions;
     grandSkipped += agg.skipped;

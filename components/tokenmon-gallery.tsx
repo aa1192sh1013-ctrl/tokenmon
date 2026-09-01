@@ -22,7 +22,7 @@ function samplePet(species: TokenmonSpecies, level: number, color: TokenmonColor
   const maxed = level >= MAX_LEVEL;
   const current = LEVEL_XP[level];
   const next = maxed ? null : LEVEL_XP[level + 1];
-  const xp = maxed ? 520_000 : Math.round((current + (next ?? current)) / 2);
+  const xp = maxed ? 5_900 : Math.round((current + (next ?? current)) / 2);
   return {
     projectName: "도감 미리보기",
     species,
@@ -36,8 +36,8 @@ function samplePet(species: TokenmonSpecies, level: number, color: TokenmonColor
     active: true,
     hungerPct: 0,
     sessionCount: level * 3,
-    outputTokens: xp * 22,
-    costUsd: Number((xp / 900).toFixed(2)),
+    outputTokens: xp * 2_600,
+    costUsd: Number((xp * 0.02).toFixed(2)),
     lastSeenAt: new Date(0).toISOString(),
   };
 }

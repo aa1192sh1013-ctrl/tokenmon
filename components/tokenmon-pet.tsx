@@ -109,7 +109,8 @@ export function TokenmonPetCard({ pet }: { pet: TokenmonPet }) {
         </p>
       </div>
       <p className="tm-card-stats">
-        출력 {formatTokenCount(pet.outputTokens)} · {formatUsd(pet.costUsd)}
+        출력 {formatTokenCount(pet.outputTokens)}
+        {pet.costUsd > 0 ? ` · ${formatUsd(pet.costUsd)}` : ""}
       </p>
       <p className="tm-say">{say}</p>
     </div>

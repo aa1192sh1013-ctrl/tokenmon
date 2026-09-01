@@ -180,12 +180,11 @@ export const MAX_LEVEL = 20;
 
 /**
  * 레벨 n 도달에 필요한 누적 XP(인덱스=레벨, 0·1번은 미사용/0).
- * 매일 종일 토큰을 태우는 개발자가 한 달쯤 갈아야 만렙(50만 XP)이 되도록 잡았다
- * — 실사용 기준 그런 페이스가 월 40만~60만 XP쯤 나온다. 라이트 유저는 만렙까지 1년 안팎.
+ * 1 XP = 총 토큰(입력+캐시+출력) 100만 개 — ccusage의 Total Tokens 감각과 같은 단위.
+ * 레벨당 ~1.2배 완만한 곡선, 만렙 누적 5,700 XP ≈ 총 57억 토큰.
  */
 export const LEVEL_XP: readonly number[] = [
-  0, 0, 120, 190, 300, 480, 760, 1_200, 1_900, 3_000, 4_800, 7_600, 12_000, 19_000, 30_000, 48_000, 76_000, 120_000,
-  190_000, 300_000, 500_000,
+  0, 0, 37, 81, 134, 198, 274, 366, 476, 608, 766, 956, 1_183, 1_456, 1_783, 2_176, 2_647, 3_212, 3_891, 4_705, 5_700,
 ];
 
 export function levelOf(xp: number): number {
@@ -304,13 +303,9 @@ function lastExpiredWindowUsedPct(sorted: TokenmonSnapshot[], key: "five_hour" |
   return best ? best.usedPct : null;
 }
 
-/** 출력 토큰 + 실제 작업 시간 + 코드 변경량으로 세션 XP를 계산한다. */
+/** 세션 XP — 총 토큰(입력·캐시 포함 + 출력) 100만 개당 1 XP. */
 export function sessionXp(session: TokenmonSession): number {
-  return (
-    Math.floor(session.outputTokens / 25) +
-    Math.floor((session.apiDurationMs / 60_000) * 6) +
-    (session.linesAdded + session.linesRemoved) * 2
-  );
+  return (session.inputTokens + session.outputTokens) / 1_000_000;
 }
 
 function petMood(active: boolean, starving: boolean, sinceActivityMs: number): TokenmonMood {
@@ -367,7 +362,8 @@ export function deriveTokenmonState(
       const idleDays = Math.floor(Math.max(0, nowMs - lastSeenMs) / 86_400_000);
       const hungerDays = active ? 0 : Math.max(0, idleDays - HUNGER_GRACE_DAYS);
       const decay = Math.pow(1 - HUNGER_DECAY_PER_DAY, hungerDays);
-      const xp = Math.floor(rawXp * decay);
+      const xp = rawXp * decay; // 1 XP = 총 토큰 100만 — 소수 XP도 그대로 둬야 100만 미만 성장이 보인다
+
       const hungerPct = Math.round((1 - decay) * 100);
 
       const level = levelOf(xp);
@@ -439,8 +435,8 @@ export function deriveTokenmonState(
 export function formatTokenCount(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return "0";
   if (value < 1000) return String(Math.round(value));
-  if (value < 1_000_000) return `${(value / 1000).toFixed(1)}k`;
-  return `${(value / 1_000_000).toFixed(2)}M`;
+  if (value < 1_000_000) return `${(value / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+  return `${(value / 1_000_000).toFixed(2).replace(/\.?0+$/, "")}M`;
 }
 
 export function formatUsd(value: number | null): string {

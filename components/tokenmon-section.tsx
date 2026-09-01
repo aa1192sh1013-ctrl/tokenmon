@@ -53,7 +53,16 @@ export async function TokenmonSection() {
   );
   const tailed = await readActiveTranscriptSnapshots(statuslineIds);
   const tailedIds = new Set(tailed.map((snapshot) => snapshot.payload.session_id));
-  const real = [...persisted.filter((snapshot) => !tailedIds.has(snapshot.payload.session_id)), ...tailed];
+  const real = [
+    ...persisted.filter((snapshot) => {
+      const id = snapshot.payload.session_id ?? "";
+      if (tailedIds.has(id)) return false; // 방금 테일링한 최신본이 대신 들어간다
+      // 상태줄이 같은 세션을 담당하게 됐다면 남아 있는 옛 테일링 스냅샷은 버린다 (이중 집계 방지)
+      if (id.startsWith("transcript-") && statuslineIds.has(sanitizeSessionId(id.slice("transcript-".length)))) return false;
+      return true;
+    }),
+    ...tailed,
+  ];
   const live = real.length > 0;
   const state = deriveTokenmonState(live ? real : mockTokenmonSnapshots(), {
     live,
