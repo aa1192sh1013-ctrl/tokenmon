@@ -4,8 +4,8 @@
 
 Tired of typing `/usage` to check your Claude Code limits? Tokenmon turns your usage into a little creature that lives in a local dashboard:
 
-- **Every project raises its own character**: each project rolls one of **60 animal-robot species** — 50 commons (10 families × 5 colorways) plus 10 rares ✨ (5 dinos, 5 mythical beasts) — picked deterministically from the project name (the egg's speckles hint at what's inside). Every Claude Code session in that project feeds it. Projects you're working on right now are awake; the rest nap in the roster 💤. Browse them all at `/gallery`.
-- **Lv.1–20 with a real grind**: maxing out (👑MAX, 500k XP) takes about a month of genuinely unhinged daily usage. **Every level changes how your pet looks** — it grows bigger each level and earns a new accessory (cheek hearts → antenna → star badge → shoes → scarf → bolts → LED → headband → ribbon → gold badge → aura → sparkles → a crown at Lv.20).
+- **Every project raises its own mecha companion**: each project rolls one of **60 distinct animal-mecha species** — 50 commons (mammals, predators, birds, reptiles, fish, sea creatures) plus 10 rares ✨ (5 dinos, 5 mythical beasts) — and separately rolls one of **12 colors** (red/orange/yellow/green/blue/indigo/violet/white/black/gold/silver/bronze), both deterministically from the project name. Every character carries robot hardware: a chest core plate with a glowing power core, panel seams, shoulder bolts, and tech-glow eyes. Projects you're working on right now are awake; the rest go into power-save 💤. Browse them all at `/gallery`.
+- **Lv.1–20, no stage classes — just continuous growth**: Lv.1 is an incubator egg; from Lv.2 your mecha grows bigger every level and earns robot upgrades (ear chips → antenna → core ring → booster feet → shoulder armor → arm bands → core overcharge → visor → wing jets → gold emblem → energy particles → golden aura at 15 → a cape at 18 → the crown at 👑Lv.20 MAX, 500k XP — about a month of unhinged daily usage).
 - **Don't waste what you already paid for**: the 5-hour bowl and weekly bucket gauges show how much of your subscription capacity you've actually eaten — whatever's left at reset **evaporates** 💸. The panel counts down to the next evaporation and reports how much you wasted last window.
 - **Neglect has consequences**: leave a project untouched for 3+ days and its character starts starving 🥀 — XP withers ~3% a day and levels can drop — until one session restores it in full. Skip a day and your streak 🔥 is gone.
 - **Real numbers, not just percentages**: per-session output tokens up front; input (cache included) and cost in the table.
@@ -74,27 +74,17 @@ Claude Code pipes session JSON into whatever command is configured as your [stat
 
 ## Leveling (per project)
 
-XP = output tokens ÷ 25 + API minutes × 6 + changed lines × 2, summed over every session in the project — weighted toward *actual work*, not leaving a window open.
+XP = output tokens ÷ 25 + API minutes × 6 + changed lines × 2, summed over every session in the project — weighted toward *actual work*, not leaving a window open. Each level costs ~1.6× the previous one (120, 190, 300, 480, 760, 1.2k, … 300k, **500k at Lv.20**). Calibrated against real `ccusage` data from a certifiable daily heavy user: Lv.20 takes about a month of hard daily grinding; casual use takes about a year.
 
-| Level | Form | Cumulative XP | Roughly |
-|---|---|---|---|
-| Lv.1 | 🥚 Egg | 0 | a quick question or two (cracks near hatching) |
-| Lv.2–7 | 🐣 Baby | 120 → 1,200 | first real day on the project |
-| Lv.8–14 | 🤖 Adult | 1,900 → 30,000 | days-to-weeks of steady work |
-| Lv.15–19 | 👑 Golden King | 48,000 → 300,000 | weeks of serious grinding — gold trim + sparkles |
-| **Lv.20** | 👑 **MAX** | **500,000** | ~a month of unhinged daily token burning |
-
-Each level costs ~1.6× the previous one (120, 190, 300, 480, 760, 1.2k, … 300k, 500k). Calibrated against real `ccusage` data from a certifiable daily heavy user.
-
-## Species gacha — 60 to collect
+## Species gacha — 60 to collect × 12 colors
 
 | Tier | Species | Odds each |
 |---|---|---|
-| Common (50) | 10 families — duck 꽥꽥 · cat 냥냥 · penguin 펭펭 · bunny 깡총 · frog 개굴 · bear 곰곰 · chick 삐약 · pig 꿀꿀 · owl 부엉 · turtle 엉금 — in 5 colorways each (레몬·딸기·민트·하늘·포도·코코아·라임·복숭아·눈꽃·먹물) | 1.8% |
+| Common (50) | 강아지·고양이·토끼·곰·판다·코알라·햄스터·생쥐·다람쥐·고슴도치·사슴·말·양·염소·젖소·돼지·코끼리·원숭이·수달·너구리 · 늑대·여우·호랑이·사자·치타·악어·뱀·박쥐·매·까마귀 · 오리·병아리·펭귄·부엉이·앵무·공작·플라밍고·백조·개구리·거북 · 상어·범고래·금붕어·복어·문어·해파리·게·가오리·해마·카멜레온 | 1.8% |
 | Dino ✨ (5) | 티라노봇 · 트리케라봇 · 스테고봇 · 브라키오봇 · 프테라봇 | **1.2%** |
-| Mythic ✨ (5) | 유니뿅 · 용용봇 · 불사삐약 · 구미호봇 · 페가봇 | **0.8%** |
+| Mythic ✨ (5) | 유니콘봇 · 드래곤봇 · 불사조봇 · 구미호봇 · 페가수스봇 | **0.8%** |
 
-The roll is a hash of the project name — deterministic, no rerolls, no crying. (Renaming the folder to reroll is between you and your conscience.)
+Color (12 options) rolls on a separate hash, so two projects with the same species can still look different. Both rolls are deterministic from the project name — no rerolls, no crying. (Renaming the folder to reroll is between you and your conscience.)
 
 ## Uninstall
 
