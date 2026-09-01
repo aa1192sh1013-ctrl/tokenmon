@@ -2,20 +2,19 @@
 
 import { useId, type ReactNode } from "react";
 import type { TokenmonColor, TokenmonSpecies } from "@/lib/tokenmon";
-import { GOLD, TECH, getColorInfo, getSpeciesInfo, type BodyKind } from "./tokenmon-species";
+import { GOLD, TECH, getColorInfo, getSpeciesInfo, type SpeciesParams } from "./tokenmon-species";
 
 /**
- * 메카-동물 벡터 렌더러. 좌표계 100×100, 바닥 y≈92.
- * 모든 캐릭터는 동물 실루엣 + 로봇 공통 레이어(코어 플레이트·판넬 심선·숄더 볼트·
- * 글로우 눈)를 가지며, 종별 파츠 레시피(tokenmon-species.ts)로 형태가 달라진다.
- * 단계 구분 없이 Lv.1은 알, Lv.2~20은 몸집 성장 + 장비 누적.
+ * 측면 실루엣 메카 렌더러 — 동물의 실제 자세(사족보행·조류·어류·착석형 등)가
+ * 그대로 보이는 프로필 뷰. 장갑 판넬·관절 조인트·발광 코어·앵귤러 렌즈 눈으로
+ * 메탈가루몬st 메카 감성을 입힌다. 좌표계 100×100, 바닥 y≈88, 머리는 왼쪽.
  */
 
 export type EyeStyle = "open" | "half" | "closed";
 
 const INK = "#262a30";
 const METAL = "#b3b9c3";
-const METAL_DARK = "#868d99";
+const METAL_DARK = "#7f8794";
 
 function mix(hex: string, target: string, t: number): string {
   const a = hex.replace("#", "");
@@ -34,1101 +33,980 @@ const darken = (hex: string, t: number) => mix(hex, "#000000", t);
 
 const S = { stroke: INK, strokeWidth: 2.2, strokeLinejoin: "round" } as const;
 
-interface Geom {
-  cy: number;
-  rx: number;
-  ry: number;
-  top: number;
-  eyeY: number;
-  eyeDx: number;
-  eyeR: number;
-  mouthY: number;
-  plateCy: number;
-  plateW: number;
-  feet: boolean;
+interface Anchors {
+  top: [number, number];
+  back: [number, number];
+  core: [number, number];
+  eye: [number, number];
+  feet: [number, number][];
 }
 
-const GEOMS: Record<BodyKind, Geom> = {
-  round: { cy: 56, rx: 27, ry: 29, top: 27, eyeY: 47, eyeDx: 10.5, eyeR: 5.4, mouthY: 58, plateCy: 69, plateW: 24, feet: true },
-  wide: { cy: 60, rx: 33, ry: 21, top: 39, eyeY: 55, eyeDx: 12, eyeR: 5, mouthY: 65, plateCy: 71, plateW: 26, feet: true },
-  fish: { cy: 56, rx: 30, ry: 24, top: 32, eyeY: 50, eyeDx: 11, eyeR: 5.2, mouthY: 61, plateCy: 69, plateW: 24, feet: false },
-  neck: { cy: 75, rx: 25, ry: 16, top: 12, eyeY: 22, eyeDx: 5.2, eyeR: 3.5, mouthY: 28.5, plateCy: 76, plateW: 20, feet: true },
-  snake: { cy: 74, rx: 26, ry: 15, top: 37, eyeY: 46, eyeDx: 6, eyeR: 3.9, mouthY: 52, plateCy: 72, plateW: 18, feet: false },
-  jelly: { cy: 52, rx: 26, ry: 22, top: 30, eyeY: 49, eyeDx: 10, eyeR: 5, mouthY: 58, plateCy: 60, plateW: 20, feet: false },
-};
+interface Ctx {
+  base: string;
+  dark: string;
+  light: string;
+  fill: string;
+  p: SpeciesParams;
+  eye: EyeStyle;
+}
 
-/* 종별 미세 조정 (눈 위치 등) */
-const GEOM_TWEAKS: Record<string, Partial<Geom>> = {
-  frog: { eyeY: 33, eyeDx: 11.5, eyeR: 4.6 },
-  croc: { eyeY: 42 },
-  owl: { eyeR: 4.8 },
-  crab: { eyeDx: 10 },
-};
+/* ---------- 공용 메카 부품 ---------- */
 
-/* 기본 입을 그리지 않는 파츠 (자기 입/부리를 가짐) */
-const MOUTH_SUPPRESS = new Set([
-  "beak:flat", "beak:tiny", "beak:tri", "beak:hook", "beak:hookBig", "beak:sharp", "beak:bent", "beak:tube",
-  "snout:dog", "snout:muzzle", "snout:pig", "snout:cow", "snout:croc", "snout:trunk",
-  "face:grin", "face:wide", "face:lips", "face:tongue",
-]);
-
-/* ---------- 눈·입 ---------- */
-
-function Eye({ cx, cy, eye, r }: { cx: number; cy: number; eye: EyeStyle; r: number }) {
+function MechEye({ x, y, eye, s = 1 }: { x: number; y: number; eye: EyeStyle; s?: number }) {
   if (eye === "closed")
-    return <path d={`M ${cx - r} ${cy} Q ${cx} ${cy + r * 0.7} ${cx + r} ${cy}`} fill="none" stroke={INK} strokeWidth={2.4} strokeLinecap="round" />;
-  if (eye === "half")
-    return (
-      <g>
-        <ellipse cx={cx} cy={cy + 0.8} rx={r} ry={r * 0.5} fill={INK} />
-        <ellipse cx={cx} cy={cy + 0.8} rx={r * 0.5} ry={r * 0.26} fill={TECH} opacity={0.9} />
-      </g>
-    );
+    return <path d={`M ${x - 5 * s} ${y + 1} L ${x + 5 * s} ${y - 1}`} stroke={INK} strokeWidth={2.6} strokeLinecap="round" fill="none" />;
+  const h = eye === "half" ? 0.55 : 1;
   return (
     <g>
-      <circle cx={cx} cy={cy} r={r} fill={INK} />
-      <circle cx={cx} cy={cy} r={r * 0.55} fill="none" stroke={TECH} strokeWidth={r * 0.32} opacity={0.95} />
-      <circle cx={cx + r * 0.32} cy={cy - r * 0.36} r={r * 0.26} fill="#fff" opacity={0.95} />
+      <path d={`M ${x - 6 * s} ${y + 1 * s} L ${x - 3 * s} ${y - 3.6 * s * h} L ${x + 5 * s} ${y - 2.6 * s * h} L ${x + 6 * s} ${y + 1.4 * s} L ${x} ${y + 3.4 * s * h} Z`} fill={INK} />
+      <path d={`M ${x - 3.6 * s} ${y + 0.6 * s} L ${x - 1.8 * s} ${y - 1.8 * s * h} L ${x + 3.6 * s} ${y - 1.2 * s * h} L ${x + 3.8 * s} ${y + 1 * s} Z`} fill={TECH} opacity={0.95} />
+      <circle cx={x + 2 * s} cy={y - 1 * s * h} r={0.9 * s} fill="#fff" opacity={0.9} />
     </g>
   );
 }
 
-function Mouth({ cx, cy, mood }: { cx: number; cy: number; mood: "smile" | "flat" | "frown" }) {
-  const d =
-    mood === "smile"
-      ? `M ${cx - 4.5} ${cy} Q ${cx} ${cy + 4} ${cx + 5.5} ${cy - 1}`
-      : mood === "frown"
-        ? `M ${cx - 4.5} ${cy + 2.5} Q ${cx} ${cy - 1.5} ${cx + 4.5} ${cy + 2.5}`
-        : `M ${cx - 4} ${cy + 1} L ${cx + 4} ${cy + 1}`;
-  return <path d={d} fill="none" stroke={INK} strokeWidth={2.2} strokeLinecap="round" />;
+function Joint({ x, y, r = 2.6 }: { x: number; y: number; r?: number }) {
+  return (
+    <g>
+      <circle cx={x} cy={y} r={r} fill={METAL} stroke={INK} strokeWidth={1.6} />
+      <circle cx={x} cy={y} r={r * 0.4} fill={METAL_DARK} />
+    </g>
+  );
+}
+
+function Leg({ x, topY, w = 7 }: { x: number; topY: number; w?: number }) {
+  return (
+    <g>
+      <rect x={x - w / 2} y={topY} width={w} height={88 - topY} rx={w / 2 - 0.5} fill={METAL} stroke={INK} strokeWidth={2} />
+      <Joint x={x} y={(topY + 86) / 2} />
+      <rect x={x - w / 2 - 1.5} y={84.5} width={w + 3} height={4.5} rx={2} fill={METAL_DARK} stroke={INK} strokeWidth={1.8} />
+    </g>
+  );
+}
+
+function Core({ x, y, r = 4 }: { x: number; y: number; r?: number }) {
+  const pts = Array.from({ length: 6 }, (_, i) => {
+    const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
+    return `${x + Math.cos(a) * (r + 2.6)},${y + Math.sin(a) * (r + 2.6)}`;
+  }).join(" ");
+  return (
+    <g>
+      <polygon points={pts} fill={METAL} stroke={INK} strokeWidth={1.8} strokeLinejoin="round" />
+      <circle cx={x} cy={y} r={r * 0.75} fill={TECH} stroke={INK} strokeWidth={1.4} />
+      <circle cx={x} cy={y} r={r * 0.28} fill="#fff" opacity={0.9} />
+    </g>
+  );
+}
+
+function HoverRing({ cx, cy, rx }: { cx: number; cy: number; rx: number }) {
+  return (
+    <g className="tm-aura">
+      <ellipse cx={cx} cy={cy} rx={rx} ry={3.4} fill={TECH} opacity={0.28} />
+      <ellipse cx={cx} cy={cy} rx={rx * 0.62} ry={2.1} fill={TECH} opacity={0.4} />
+    </g>
+  );
 }
 
 function star4(cx: number, cy: number, r: number): string {
   return `M ${cx} ${cy - r} Q ${cx} ${cy} ${cx + r} ${cy} Q ${cx} ${cy} ${cx} ${cy + r} Q ${cx} ${cy} ${cx - r} ${cy} Q ${cx} ${cy} ${cx} ${cy - r} Z`;
 }
 
-/* ---------- 파츠 라이브러리 ---------- */
+/* ---------- 머즐·귀·꼬리 (사족/착석 공용) ---------- */
 
-interface Ctx {
-  g: Geom;
-  base: string;
-  dark: string;
-  light: string;
-  fill: string; // 몸 그라데이션 참조
-}
-
-function renderPart(family: string, kind: string, c: Ctx): { behind?: ReactNode; front?: ReactNode } {
-  const { g, base, dark, light, fill } = c;
-  const key = `${family}:${kind}`;
-  const L = 50 - g.rx;
-  const R = 50 + g.rx;
-
-  switch (key) {
-    /* ---- 귀 ---- */
-    case "ear:floppy":
-      return {
-        behind: (
-          <>
-            <ellipse cx={L + 6} cy={g.top + 7} rx={6.5} ry={11.5} fill={fill} {...S} transform={`rotate(26 ${L + 6} ${g.top + 7})`} />
-            <ellipse cx={R - 6} cy={g.top + 7} rx={6.5} ry={11.5} fill={fill} {...S} transform={`rotate(-26 ${R - 6} ${g.top + 7})`} />
-          </>
-        ),
-      };
-    case "ear:pointy":
-      return {
-        behind: (
-          <>
-            <path d={`M ${L + 3} ${g.top + 9} L ${L - 1} ${g.top - 8} L ${L + 16} ${g.top + 2} Z`} fill={fill} {...S} />
-            <path d={`M ${R - 3} ${g.top + 9} L ${R + 1} ${g.top - 8} L ${R - 16} ${g.top + 2} Z`} fill={fill} {...S} />
-            <path d={`M ${L + 5} ${g.top + 5} L ${L + 3} ${g.top - 3} L ${L + 11} ${g.top + 2} Z`} fill={dark} stroke="none" />
-            <path d={`M ${R - 5} ${g.top + 5} L ${R - 3} ${g.top - 3} L ${R - 11} ${g.top + 2} Z`} fill={dark} stroke="none" />
-          </>
-        ),
-      };
-    case "ear:tall":
-      return {
-        behind: (
-          <>
-            <path d={`M ${L + 4} ${g.top + 8} L ${L + 1} ${g.top - 15} L ${L + 17} ${g.top + 1} Z`} fill={fill} {...S} />
-            <path d={`M ${R - 4} ${g.top + 8} L ${R - 1} ${g.top - 15} L ${R - 17} ${g.top + 1} Z`} fill={fill} {...S} />
-          </>
-        ),
-      };
-    case "ear:round":
-      return {
-        behind: (
-          <>
-            <circle cx={L + 7} cy={g.top + 2} r={7.5} fill={fill} {...S} />
-            <circle cx={R - 7} cy={g.top + 2} r={7.5} fill={fill} {...S} />
-            <circle cx={L + 7} cy={g.top + 2} r={3.6} fill={dark} stroke="none" />
-            <circle cx={R - 7} cy={g.top + 2} r={3.6} fill={dark} stroke="none" />
-          </>
-        ),
-      };
-    case "ear:big":
-      return {
-        behind: (
-          <>
-            <circle cx={L + 3} cy={g.top + 4} r={11} fill={fill} {...S} />
-            <circle cx={R - 3} cy={g.top + 4} r={11} fill={fill} {...S} />
-            <circle cx={L + 3} cy={g.top + 4} r={5.5} fill={dark} stroke="none" />
-            <circle cx={R - 3} cy={g.top + 4} r={5.5} fill={dark} stroke="none" />
-          </>
-        ),
-      };
-    case "ear:long":
-      return {
-        behind: (
-          <>
-            <rect x={L + 8} y={g.top - 22} width={11} height={30} rx={5.5} fill={fill} {...S} transform={`rotate(-8 ${L + 13} ${g.top})`} />
-            <rect x={R - 19} y={g.top - 22} width={11} height={30} rx={5.5} fill={fill} {...S} transform={`rotate(8 ${R - 13} ${g.top})`} />
-            <rect x={L + 11} y={g.top - 17} width={5} height={20} rx={2.5} fill={dark} stroke="none" transform={`rotate(-8 ${L + 13} ${g.top})`} />
-            <rect x={R - 16} y={g.top - 17} width={5} height={20} rx={2.5} fill={dark} stroke="none" transform={`rotate(8 ${R - 13} ${g.top})`} />
-          </>
-        ),
-      };
-    case "ear:tuft":
-      return {
-        behind: (
-          <>
-            <path d={`M ${L + 5} ${g.top + 7} L ${L + 3} ${g.top - 6} L ${L + 14} ${g.top + 2} Z`} fill={fill} {...S} />
-            <path d={`M ${R - 5} ${g.top + 7} L ${R - 3} ${g.top - 6} L ${R - 14} ${g.top + 2} Z`} fill={fill} {...S} />
-            <path d={`M ${L + 4} ${g.top - 4} q -2 -4 1 -7 M ${R - 4} ${g.top - 4} q 2 -4 -1 -7`} fill="none" stroke={INK} strokeWidth={2} strokeLinecap="round" />
-          </>
-        ),
-      };
-    case "ear:huge":
-      return {
-        behind: (
-          <>
-            <ellipse cx={L - 3} cy={g.cy - 12} rx={12} ry={15} fill={fill} {...S} />
-            <ellipse cx={R + 3} cy={g.cy - 12} rx={12} ry={15} fill={fill} {...S} />
-            <ellipse cx={L - 3} cy={g.cy - 12} rx={6.5} ry={9} fill={dark} stroke="none" />
-            <ellipse cx={R + 3} cy={g.cy - 12} rx={6.5} ry={9} fill={dark} stroke="none" />
-          </>
-        ),
-      };
-    case "ear:side":
-      return {
-        behind: (
-          <>
-            <circle cx={L + 1} cy={g.eyeY + 2} r={7} fill={fill} {...S} />
-            <circle cx={R - 1} cy={g.eyeY + 2} r={7} fill={fill} {...S} />
-          </>
-        ),
-      };
-    case "ear:tufts":
-      return {
-        behind: (
-          <>
-            <path d={`M ${L + 6} ${g.top + 6} L ${L + 2} ${g.top - 7} L ${L + 14} ${g.top + 1} Z`} fill={fill} {...S} />
-            <path d={`M ${R - 6} ${g.top + 6} L ${R - 2} ${g.top - 7} L ${R - 14} ${g.top + 1} Z`} fill={fill} {...S} />
-          </>
-        ),
-      };
-    case "ear:stalks":
-      return {
-        behind: (
-          <>
-            <line x1={42} y1={g.top + 3} x2={38} y2={g.top - 9} stroke={INK} strokeWidth={2.6} strokeLinecap="round" />
-            <line x1={58} y1={g.top + 3} x2={62} y2={g.top - 9} stroke={INK} strokeWidth={2.6} strokeLinecap="round" />
-            <circle cx={38} cy={g.top - 11} r={3.4} fill={TECH} stroke={INK} strokeWidth={1.8} />
-            <circle cx={62} cy={g.top - 11} r={3.4} fill={TECH} stroke={INK} strokeWidth={1.8} />
-          </>
-        ),
-      };
-    /* ---- 부리 ---- */
-    case "beak:flat":
-      return {
-        front: (
-          <>
-            <ellipse cx={50} cy={g.mouthY - 1} rx={9} ry={4.6} fill="#d98a3a" {...S} />
-            <ellipse cx={50} cy={g.mouthY + 2.4} rx={6} ry={2.8} fill="#b56d24" {...S} />
-          </>
-        ),
-      };
-    case "beak:tiny":
-      return { front: <path d={`M 46.5 ${g.mouthY - 4} L 53.5 ${g.mouthY - 4} L 50 ${g.mouthY + 1.5} Z`} fill="#d98a3a" {...S} /> };
-    case "beak:tri":
-      return { front: <path d={`M 45.5 ${g.mouthY - 4} L 54.5 ${g.mouthY - 4} L 50 ${g.mouthY + 3} Z`} fill="#d98a3a" {...S} /> };
-    case "beak:hook":
-      return { front: <path d={`M 45 ${g.mouthY - 6} Q 56 ${g.mouthY - 8} 55 ${g.mouthY} Q 54 ${g.mouthY + 5} 49 ${g.mouthY + 2} Q 52 ${g.mouthY - 1} 45 ${g.mouthY - 2} Z`} fill="#c8872f" {...S} /> };
-    case "beak:hookBig":
-      return { front: <path d={`M 42 ${g.mouthY - 8} Q 60 ${g.mouthY - 11} 58 ${g.mouthY + 1} Q 56 ${g.mouthY + 9} 48 ${g.mouthY + 4} Q 53 ${g.mouthY} 42 ${g.mouthY - 1} Z`} fill="#c8872f" {...S} /> };
-    case "beak:sharp":
-      return { front: <path d={`M 44 ${g.mouthY - 5} L 62 ${g.mouthY - 1} L 44 ${g.mouthY + 3} Z`} fill="#c8872f" {...S} /> };
-    case "beak:bent":
-      return {
-        front: (
-          <>
-            <path d={`M 45 ${g.mouthY - 4} Q 57 ${g.mouthY - 5} 57 ${g.mouthY + 4} Q 57 ${g.mouthY + 9} 52 ${g.mouthY + 9} L 51 ${g.mouthY + 2} Q 48 ${g.mouthY} 45 ${g.mouthY} Z`} fill="#e8a0a8" {...S} />
-            <path d={`M 52 ${g.mouthY + 4} L 57 ${g.mouthY + 4} Q 57 ${g.mouthY + 9} 52 ${g.mouthY + 9} Z`} fill={INK} stroke="none" />
-          </>
-        ),
-      };
-    case "beak:tube":
-      return { front: <rect x={50} y={g.mouthY - 4.5} width={13} height={6} rx={3} fill={darken(base, 0.12)} {...S} /> };
-    /* ---- 주둥이·코 ---- */
-    case "snout:dog":
-      return {
-        front: (
-          <>
-            <ellipse cx={50} cy={g.mouthY} rx={8.5} ry={6} fill={light} {...S} />
-            <ellipse cx={50} cy={g.mouthY - 3} rx={3.2} ry={2.4} fill={INK} />
-            <path d={`M 50 ${g.mouthY - 1} L 50 ${g.mouthY + 2} M 50 ${g.mouthY + 2} Q 47 ${g.mouthY + 4.5} 45 ${g.mouthY + 2.5} M 50 ${g.mouthY + 2} Q 53 ${g.mouthY + 4.5} 55 ${g.mouthY + 2.5}`} fill="none" stroke={INK} strokeWidth={1.8} strokeLinecap="round" />
-          </>
-        ),
-      };
-    case "snout:muzzle":
-      return {
-        front: (
-          <>
-            <ellipse cx={50} cy={g.mouthY} rx={7.5} ry={5.2} fill={light} {...S} />
-            <ellipse cx={50} cy={g.mouthY - 2.6} rx={2.8} ry={2} fill={INK} />
-          </>
-        ),
-      };
-    case "snout:tri":
-      return { front: <path d={`M 47.5 ${g.mouthY - 4.5} L 52.5 ${g.mouthY - 4.5} L 50 ${g.mouthY - 1.5} Z`} fill={INK} stroke="none" /> };
-    case "snout:nose":
-      return { front: <ellipse cx={50} cy={g.mouthY - 3} rx={4.2} ry={3.2} fill={INK} /> };
-    case "snout:pig":
-      return {
-        front: (
-          <>
-            <ellipse cx={50} cy={g.mouthY - 1.5} rx={8} ry={5.8} fill={lighten(base, 0.25)} {...S} />
-            <ellipse cx={46.8} cy={g.mouthY - 1.5} rx={1.6} ry={2.4} fill={darken(base, 0.4)} />
-            <ellipse cx={53.2} cy={g.mouthY - 1.5} rx={1.6} ry={2.4} fill={darken(base, 0.4)} />
-          </>
-        ),
-      };
-    case "snout:cow":
-      return {
-        front: (
-          <>
-            <ellipse cx={50} cy={g.mouthY} rx={10} ry={5.6} fill={light} {...S} />
-            <ellipse cx={45.5} cy={g.mouthY} rx={1.8} ry={2.4} fill={darken(base, 0.35)} />
-            <ellipse cx={54.5} cy={g.mouthY} rx={1.8} ry={2.4} fill={darken(base, 0.35)} />
-          </>
-        ),
-      };
-    case "snout:croc":
-      return {
-        front: (
-          <>
-            <rect x={38} y={g.mouthY - 5} width={24} height={10.5} rx={5} fill={fill} {...S} />
-            <path d={`M 40 ${g.mouthY + 5.5} l 3 -3.4 l 3 3.4 l 3 -3.4 l 3 3.4 l 3 -3.4 l 3 3.4 l 2.5 -3.4`} fill="none" stroke="#fff" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
-            <circle cx={43} cy={g.mouthY - 2.6} r={1.4} fill={INK} />
-            <circle cx={57} cy={g.mouthY - 2.6} r={1.4} fill={INK} />
-          </>
-        ),
-      };
-    case "snout:trunk":
-      return {
-        front: (
-          <path d={`M 45.5 ${g.mouthY - 6} Q 44 ${g.mouthY + 8} 52 ${g.mouthY + 12} Q 58 ${g.mouthY + 14} 58 ${g.mouthY + 9} Q 54 ${g.mouthY + 8} 53 ${g.mouthY + 4} Q 52 ${g.mouthY - 2} 54.5 ${g.mouthY - 6} Z`} fill={fill} {...S} />
-        ),
-      };
-    /* ---- 뿔 ---- */
-    case "horns:small":
-      return {
-        behind: (
-          <>
-            <path d={`M ${L + 8} ${g.top + 4} q -4 -7 1 -10 q 3 4 3 9 Z`} fill="#e8e2d2" {...S} />
-            <path d={`M ${R - 8} ${g.top + 4} q 4 -7 -1 -10 q -3 4 -3 9 Z`} fill="#e8e2d2" {...S} />
-          </>
-        ),
-      };
-    case "horns:back":
-      return {
-        behind: (
-          <>
-            <path d={`M ${L + 10} ${g.top + 3} Q ${L + 2} ${g.top - 10} ${L + 12} ${g.top - 14} Q ${L + 14} ${g.top - 4} ${L + 16} ${g.top + 1} Z`} fill="#d8d2c2" {...S} />
-            <path d={`M ${R - 10} ${g.top + 3} Q ${R - 2} ${g.top - 10} ${R - 12} ${g.top - 14} Q ${R - 14} ${g.top - 4} ${R - 16} ${g.top + 1} Z`} fill="#d8d2c2" {...S} />
-          </>
-        ),
-      };
-    case "horns:curved":
-      return {
-        behind: (
-          <>
-            <path d={`M 39 ${g.top + 3} Q 33 ${g.top - 9} 26 ${g.top - 7} Q 32 ${g.top - 2} 36 ${g.top + 6} Z`} fill={GOLD} {...S} />
-            <path d={`M 61 ${g.top + 3} Q 67 ${g.top - 9} 74 ${g.top - 7} Q 68 ${g.top - 2} 64 ${g.top + 6} Z`} fill={GOLD} {...S} />
-          </>
-        ),
-      };
-    case "horns:three":
-      return {
-        behind: (
-          <>
-            <path d={`M 39 ${g.top + 6} L 34 ${g.top - 9} L 44 ${g.top + 1} Z`} fill="#eee7d8" {...S} />
-            <path d={`M 61 ${g.top + 6} L 66 ${g.top - 9} L 56 ${g.top + 1} Z`} fill="#eee7d8" {...S} />
-            <path d={`M 47 ${g.eyeY - 6} L 50 ${g.eyeY - 14} L 53 ${g.eyeY - 6} Z`} fill="#eee7d8" {...S} />
-          </>
-        ),
-      };
-    case "horns:spiral":
-      return {
-        behind: (
-          <>
-            <path d={`M 46.5 ${g.top + 2} L 50 ${g.top - 17} L 53.5 ${g.top + 2} Z`} fill={GOLD} {...S} />
-            <path d={`M 47.6 ${g.top - 3} L 52.4 ${g.top - 5} M 48.4 ${g.top - 8} L 51.6 ${g.top - 9.5}`} stroke={darken(GOLD, 0.3)} strokeWidth={1.6} />
-          </>
-        ),
-      };
-    case "horns:antler":
-      return {
-        behind: (
-          <g fill="none" stroke="#9c8862" strokeWidth={3.2} strokeLinecap="round">
-            <path d={`M ${L + 10} ${g.top + 2} Q ${L + 4} ${g.top - 12} ${L + 10} ${g.top - 18} M ${L + 6} ${g.top - 8} L ${L - 1} ${g.top - 13}`} />
-            <path d={`M ${R - 10} ${g.top + 2} Q ${R - 4} ${g.top - 12} ${R - 10} ${g.top - 18} M ${R - 6} ${g.top - 8} L ${R + 1} ${g.top - 13}`} />
-          </g>
-        ),
-      };
-    /* ---- 갈기·털 ---- */
-    case "mane:ruff":
-      return {
-        behind: (
-          <g>
-            {Array.from({ length: 10 }, (_, i) => {
-              const a = (i / 10) * Math.PI * 2;
-              const cx = 50 + Math.cos(a) * (g.rx + 2);
-              const cyy = g.eyeY + 2 + Math.sin(a) * (g.rx + 2) * 0.82;
-              return <path key={i} d={`M ${cx} ${cyy} L ${50 + Math.cos(a) * (g.rx + 13)} ${g.eyeY + 2 + Math.sin(a) * (g.rx + 13) * 0.82} L ${50 + Math.cos(a + 0.33) * (g.rx + 2)} ${g.eyeY + 2 + Math.sin(a + 0.33) * (g.rx + 2) * 0.82} Z`} fill={darken(base, 0.28)} {...S} />;
-            })}
-          </g>
-        ),
-      };
-    case "mane:top":
-      return {
-        behind: (
-          <path d={`M 40 ${g.top + 4} Q 42 ${g.top - 8} 50 ${g.top - 9} Q 58 ${g.top - 8} 60 ${g.top + 4} Q 50 ${g.top - 2} 40 ${g.top + 4} Z`} fill={darken(base, 0.3)} {...S} />
-        ),
-      };
-    case "mane:flow":
-      return {
-        behind: (
-          <>
-            <path d={`M ${L + 8} ${g.top + 2} Q ${L - 8} ${g.top + 10} ${L - 2} ${g.top + 28} Q ${L + 8} ${g.top + 20} ${L + 10} ${g.top + 8} Z`} fill="#e88ab0" {...S} />
-            <path d={`M ${L + 12} ${g.top - 2} Q ${L + 2} ${g.top + 8} ${L + 8} ${g.top + 20}`} fill="none" stroke={darken("#e88ab0", 0.2)} strokeWidth={2} strokeLinecap="round" />
-          </>
-        ),
-      };
-    case "mane:wool":
-      return {
-        behind: (
-          <g fill="#f2f0ea" {...S}>
-            {[-14, -5, 4, 13].map((dx, i) => (
-              <circle key={i} cx={50 + dx} cy={g.top + 2 - (i % 2 === 1 ? 4 : 0)} r={7.5} />
-            ))}
-          </g>
-        ),
-      };
-    case "mane:beard":
-      return { front: <path d={`M 46 ${g.mouthY + 4} Q 50 ${g.mouthY + 13} 54 ${g.mouthY + 4} Z`} fill="#f2f0ea" {...S} /> };
-    /* ---- 볏·크레스트 ---- */
-    case "crest:three":
-      return {
-        behind: (
-          <g fill="none" stroke={INK} strokeWidth={2.4} strokeLinecap="round">
-            {[-6, 0, 6].map((dx, i) => (
-              <path key={i} d={`M ${50 + dx} ${g.top + 2} Q ${50 + dx - 2} ${g.top - 8 - (i === 1 ? 4 : 0)} ${50 + dx + 3} ${g.top - 6 - (i === 1 ? 4 : 0)}`} />
-            ))}
-          </g>
-        ),
-      };
-    case "crest:tall":
-      return {
-        behind: (
-          <>
-            <path d={`M 44 ${g.top + 3} Q 40 ${g.top - 14} 50 ${g.top - 16} Q 60 ${g.top - 14} 56 ${g.top + 3} Z`} fill={darken(base, 0.2)} {...S} />
-            <path d={`M 47 ${g.top + 1} Q 46 ${g.top - 9} 50 ${g.top - 11}`} fill="none" stroke={INK} strokeWidth={1.6} opacity={0.5} />
-          </>
-        ),
-      };
-    case "crest:tuft":
-      return {
-        behind: (
-          <g fill="none" stroke={INK} strokeWidth={2.2} strokeLinecap="round">
-            <path d={`M 45 ${g.top + 2} q -3 -7 2 -9 M 51 ${g.top} q 0 -8 5 -8 M 55 ${g.top + 2} q 4 -5 8 -3`} />
-          </g>
-        ),
-      };
-    case "crest:curl":
-      return { behind: <path d={`M 47 ${g.top} Q 50 ${g.top - 9} 57 ${g.top - 5}`} fill="none" stroke={INK} strokeWidth={2.6} strokeLinecap="round" /> };
-    case "crest:pins":
-      return {
-        behind: (
-          <g>
-            {[-7, 0, 7].map((dx, i) => (
-              <g key={i}>
-                <line x1={50 + dx * 0.5} y1={g.top + 2} x2={50 + dx} y2={g.top - 10} stroke={INK} strokeWidth={1.8} />
-                <circle cx={50 + dx} cy={g.top - 11.5} r={2.6} fill={TECH} stroke={INK} strokeWidth={1.6} />
-              </g>
-            ))}
-          </g>
-        ),
-      };
-    case "crest:flame":
-      return {
-        behind: (
-          <g>
-            {[-8, 0, 8].map((dx, i) => (
-              <path key={i} d={`M ${50 + dx - 3} ${g.top + 3} Q ${50 + dx - 4} ${g.top - 9 - (i === 1 ? 5 : 0)} ${50 + dx + 1} ${g.top - 12 - (i === 1 ? 5 : 0)} Q ${50 + dx + 4} ${g.top - 5} ${50 + dx + 3} ${g.top + 3} Z`} fill={i === 1 ? GOLD : "#d96a3c"} {...S} />
-            ))}
-          </g>
-        ),
-      };
-    case "crest:back":
-      return { behind: <path d={`M 50 ${g.top + 2} Q 64 ${g.top - 10} 72 ${g.top - 4} Q 62 ${g.top} 53 ${g.top + 6} Z`} fill={darken(base, 0.2)} {...S} /> };
-    case "crest:ridge":
-      return {
-        behind: (
-          <g fill={darken(base, 0.22)} {...S}>
-            {[-8, 0, 8].map((dx, i) => (
-              <path key={i} d={`M ${50 + dx - 4} ${g.top + 3} Q ${50 + dx} ${g.top - 6} ${50 + dx + 4} ${g.top + 3} Z`} />
-            ))}
-          </g>
-        ),
-      };
-    /* ---- 날개·팔 ---- */
-    case "wings:small":
-      return {
-        behind: (
-          <>
-            <ellipse cx={L + 2} cy={g.cy + 2} rx={6.5} ry={11} fill={darken(base, 0.12)} {...S} transform={`rotate(16 ${L + 2} ${g.cy})`} />
-            <ellipse cx={R - 2} cy={g.cy + 2} rx={6.5} ry={11} fill={darken(base, 0.12)} {...S} transform={`rotate(-16 ${R - 2} ${g.cy})`} />
-          </>
-        ),
-      };
-    case "wings:side":
-      return {
-        behind: (
-          <>
-            <path d={`M ${L + 4} ${g.cy - 8} Q ${L - 10} ${g.cy} ${L + 2} ${g.cy + 16} Q ${L + 8} ${g.cy + 8} ${L + 8} ${g.cy - 4} Z`} fill={darken(base, 0.18)} {...S} />
-            <path d={`M ${R - 4} ${g.cy - 8} Q ${R + 10} ${g.cy} ${R - 2} ${g.cy + 16} Q ${R - 8} ${g.cy + 8} ${R - 8} ${g.cy - 4} Z`} fill={darken(base, 0.18)} {...S} />
-          </>
-        ),
-      };
-    case "wings:flippers":
-      return {
-        behind: (
-          <>
-            <ellipse cx={L} cy={g.cy + 5} rx={6} ry={13} fill={fill} {...S} transform={`rotate(20 ${L} ${g.cy + 5})`} />
-            <ellipse cx={R} cy={g.cy + 5} rx={6} ry={13} fill={fill} {...S} transform={`rotate(-20 ${R} ${g.cy + 5})`} />
-          </>
-        ),
-      };
-    case "wings:bat":
-    case "wings:batBig": {
-      const w = kind === "batBig" ? 1.35 : 1;
-      return {
-        behind: (
-          <>
-            <path d={`M ${L + 6} ${g.cy - 10} Q ${L - 20 * w} ${g.cy - 18 * w} ${L - 16 * w} ${g.cy + 12} L ${L - 6 * w} ${g.cy + 6} L ${L + 2} ${g.cy + 12} Z`} fill={darken(base, 0.3)} {...S} />
-            <path d={`M ${R - 6} ${g.cy - 10} Q ${R + 20 * w} ${g.cy - 18 * w} ${R + 16 * w} ${g.cy + 12} L ${R + 6 * w} ${g.cy + 6} L ${R - 2} ${g.cy + 12} Z`} fill={darken(base, 0.3)} {...S} />
-          </>
-        ),
-      };
-    }
-    case "wings:ptera":
-      return {
-        behind: (
-          <>
-            <path d={`M ${L + 6} ${g.cy - 6} Q ${L - 24} ${g.cy - 22} ${L - 18} ${g.cy + 16} Q ${L - 4} ${g.cy + 8} ${L + 6} ${g.cy + 4} Z`} fill={darken(base, 0.18)} {...S} />
-            <path d={`M ${R - 6} ${g.cy - 6} Q ${R + 24} ${g.cy - 22} ${R + 18} ${g.cy + 16} Q ${R + 4} ${g.cy + 8} ${R - 6} ${g.cy + 4} Z`} fill={darken(base, 0.18)} {...S} />
-          </>
-        ),
-      };
-    case "wings:flame":
-      return {
-        behind: (
-          <>
-            <path d={`M ${L + 4} ${g.cy - 4} Q ${L - 16} ${g.cy - 14} ${L - 10} ${g.cy + 14} Q ${L - 2} ${g.cy + 8} ${L + 6} ${g.cy + 4} Z`} fill="#d96a3c" {...S} />
-            <path d={`M ${R - 4} ${g.cy - 4} Q ${R + 16} ${g.cy - 14} ${R + 10} ${g.cy + 14} Q ${R + 2} ${g.cy + 8} ${R - 6} ${g.cy + 4} Z`} fill="#d96a3c" {...S} />
-            <path d={`M ${L - 6} ${g.cy - 2} Q ${L - 10} ${g.cy + 2} ${L - 7} ${g.cy + 8} M ${R + 6} ${g.cy - 2} Q ${R + 10} ${g.cy + 2} ${R + 7} ${g.cy + 8}`} fill="none" stroke={GOLD} strokeWidth={2} strokeLinecap="round" />
-          </>
-        ),
-      };
-    case "wings:feather":
-      return {
-        behind: (
-          <>
-            {[0, 1, 2].map((i) => (
-              <ellipse key={i} cx={L - 4 - i * 4} cy={g.cy - 4 + i * 6} rx={12 - i * 2} ry={5.5 - i * 0.8} fill="#f4f5f8" {...S} transform={`rotate(${-24 - i * 14} ${L - 4 - i * 4} ${g.cy - 4 + i * 6})`} />
-            ))}
-            {[0, 1, 2].map((i) => (
-              <ellipse key={`r${i}`} cx={R + 4 + i * 4} cy={g.cy - 4 + i * 6} rx={12 - i * 2} ry={5.5 - i * 0.8} fill="#f4f5f8" {...S} transform={`rotate(${24 + i * 14} ${R + 4 + i * 4} ${g.cy - 4 + i * 6})`} />
-            ))}
-          </>
-        ),
-      };
-    case "wings:flat":
-      return {
-        behind: (
-          <>
-            <path d={`M ${L + 8} ${g.cy - 8} Q ${L - 16} ${g.cy} ${L + 6} ${g.cy + 10} Z`} fill={fill} {...S} />
-            <path d={`M ${R - 8} ${g.cy - 8} Q ${R + 16} ${g.cy} ${R - 6} ${g.cy + 10} Z`} fill={fill} {...S} />
-          </>
-        ),
-      };
-    case "wings:flowfins":
-      return {
-        behind: (
-          <>
-            <path d={`M ${L + 4} ${g.cy} Q ${L - 12} ${g.cy - 6} ${L - 8} ${g.cy + 12} Q ${L} ${g.cy + 8} ${L + 5} ${g.cy + 6} Z`} fill={lighten(base, 0.2)} {...S} />
-            <path d={`M ${R - 4} ${g.cy} Q ${R + 12} ${g.cy - 6} ${R + 8} ${g.cy + 12} Q ${R} ${g.cy + 8} ${R - 5} ${g.cy + 6} Z`} fill={lighten(base, 0.2)} {...S} />
-          </>
-        ),
-      };
-    case "wings:claws":
-      return {
-        behind: (
-          <>
-            <path d={`M ${L + 4} ${g.cy - 2} Q ${L - 12} ${g.cy - 14} ${L - 8} ${g.top - 4} Q ${L - 16} ${g.top + 2} ${L - 13} ${g.top - 12} Q ${L - 2} ${g.top - 14} ${L + 2} ${g.top - 2} Z`} fill={fill} {...S} />
-            <path d={`M ${R - 4} ${g.cy - 2} Q ${R + 12} ${g.cy - 14} ${R + 8} ${g.top - 4} Q ${R + 16} ${g.top + 2} ${R + 13} ${g.top - 12} Q ${R + 2} ${g.top - 14} ${R - 2} ${g.top - 2} Z`} fill={fill} {...S} />
-          </>
-        ),
-      };
-    case "wings:tinyArms":
-      return {
-        front: (
-          <>
-            <path d={`M ${L + 7} ${g.cy + 2} q -6 3 -4 8`} fill="none" stroke={INK} strokeWidth={4.4} strokeLinecap="round" />
-            <path d={`M ${R - 7} ${g.cy + 2} q 6 3 4 8`} fill="none" stroke={INK} strokeWidth={4.4} strokeLinecap="round" />
-          </>
-        ),
-      };
-    /* ---- 꼬리 ---- */
-    case "tail:bushy":
-      return { behind: <ellipse cx={R + 6} cy={g.cy - 8} rx={8} ry={17} fill={darken(base, 0.15)} {...S} transform={`rotate(18 ${R + 6} ${g.cy - 8})`} /> };
-    case "tail:fox":
-      return {
-        behind: (
-          <>
-            <ellipse cx={R + 7} cy={g.cy + 6} rx={7.5} ry={15} fill={fill} {...S} transform={`rotate(24 ${R + 7} ${g.cy + 6})`} />
-            <ellipse cx={R + 12} cy={g.cy - 5} rx={4} ry={6} fill="#f4f5f8" stroke="none" transform={`rotate(24 ${R + 12} ${g.cy - 5})`} />
-          </>
-        ),
-      };
-    case "tail:nine":
-      return {
-        behind: (
-          <g>
-            {[-2, -1, 0, 1, 2].map((i) => (
-              <g key={i} transform={`rotate(${i * 24} 50 ${g.cy + g.ry - 4})`}>
-                <ellipse cx={50} cy={g.cy + g.ry - 26} rx={6.5} ry={19} fill={fill} {...S} />
-                <ellipse cx={50} cy={g.cy + g.ry - 39} rx={3.6} ry={6.5} fill="#f4f5f8" stroke="none" />
-              </g>
-            ))}
-          </g>
-        ),
-      };
-    case "tail:fluke":
-      return { behind: <path d={`M 44 ${g.cy + g.ry - 2} Q 36 ${g.cy + g.ry + 12} 28 ${g.cy + g.ry + 8} Q 38 ${g.cy + g.ry + 16} 50 ${g.cy + g.ry + 10} Q 62 ${g.cy + g.ry + 16} 72 ${g.cy + g.ry + 8} Q 64 ${g.cy + g.ry + 12} 56 ${g.cy + g.ry - 2} Z`} fill={fill} {...S} /> };
-    case "tail:fan":
-      return {
-        behind: (
-          <g fill={lighten(base, 0.18)} {...S}>
-            <path d={`M 46 ${g.cy + g.ry - 4} Q 34 ${g.cy + g.ry + 14} 40 ${g.cy + g.ry + 18} Q 48 ${g.cy + g.ry + 8} 50 ${g.cy + g.ry} Z`} />
-            <path d={`M 54 ${g.cy + g.ry - 4} Q 66 ${g.cy + g.ry + 14} 60 ${g.cy + g.ry + 18} Q 52 ${g.cy + g.ry + 8} 50 ${g.cy + g.ry} Z`} />
-          </g>
-        ),
-      };
-    case "tail:thin":
-      return { behind: <path d={`M 50 ${g.cy + g.ry - 2} Q 46 ${g.cy + g.ry + 16} 54 ${g.cy + g.ry + 22}`} fill="none" stroke={INK} strokeWidth={2.8} strokeLinecap="round" /> };
-    case "tail:curl":
-      return { behind: <path d={`M ${R - 2} ${g.cy + 10} Q ${R + 14} ${g.cy + 6} ${R + 10} ${g.cy - 4} Q ${R + 7} ${g.cy - 10} ${R + 2} ${g.cy - 6}`} fill="none" stroke={darken(base, 0.15)} strokeWidth={4.5} strokeLinecap="round" /> };
-    case "tail:tentacles":
-      return {
-        behind: (
-          <g fill={fill} {...S}>
-            {[-18, -9, 0, 9, 18].map((dx, i) => (
-              <path key={i} d={`M ${48 + dx} ${g.cy + g.ry - 8} Q ${46 + dx + (i % 2 ? 6 : -6)} ${g.cy + g.ry + 14} ${52 + dx} ${g.cy + g.ry + 16} Q ${54 + dx} ${g.cy + g.ry + 6} ${54 + dx} ${g.cy + g.ry - 8} Z`} />
-            ))}
-          </g>
-        ),
-      };
-    case "tail:strips":
-      return {
-        behind: (
-          <g fill="none" stroke={lighten(base, 0.15)} strokeWidth={3.4} strokeLinecap="round">
-            {[-15, -5, 5, 15].map((dx, i) => (
-              <path key={i} d={`M ${50 + dx} ${g.cy + g.ry - 6} Q ${50 + dx + (i % 2 ? 5 : -5)} ${g.cy + g.ry + 8} ${50 + dx} ${g.cy + g.ry + 18}`} />
-            ))}
-          </g>
-        ),
-      };
-    /* ---- 등·배경 파츠 ---- */
-    case "back:spikesCrown":
-      return {
-        behind: (
-          <g fill={darken(base, 0.3)} {...S}>
-            {[-16, -8, 0, 8, 16].map((dx, i) => (
-              <path key={i} d={`M ${50 + dx - 4} ${g.top + 6} L ${50 + dx} ${g.top - 8 - (i % 2 ? 3 : 0)} L ${50 + dx + 4} ${g.top + 6} Z`} />
-            ))}
-          </g>
-        ),
-      };
-    case "back:ridges":
-      return {
-        behind: (
-          <g fill={darken(base, 0.2)} {...S}>
-            {[-12, 0, 12].map((dx, i) => (
-              <path key={i} d={`M ${50 + dx - 4} ${g.top + 5} Q ${50 + dx} ${g.top - 4} ${50 + dx + 4} ${g.top + 5} Z`} />
-            ))}
-          </g>
-        ),
-      };
-    case "back:dorsal":
-      return { behind: <path d={`M 44 ${g.top + 4} Q 48 ${g.top - 14} 60 ${g.top - 10} Q 54 ${g.top - 2} 56 ${g.top + 6} Z`} fill={fill} {...S} /> };
-    case "back:spikes":
-      return {
-        behind: (
-          <g fill={darken(base, 0.25)} {...S}>
-            {[-11, 0, 11].map((dx, i) => (
-              <path key={i} d={`M ${50 + dx - 5} ${g.top + 4} L ${50 + dx} ${g.top - 10} L ${50 + dx + 5} ${g.top + 4} Z`} />
-            ))}
-          </g>
-        ),
-      };
-    case "back:plates":
+function muzzleOf(kind: string, hx: number, hy: number, c: Ctx): ReactNode {
+  switch (kind) {
+    case "wolf":
       return (
-        {
-          behind: (
-            <g fill={darken(base, 0.22)} {...S}>
-              {[-15, -5, 5, 15].map((dx, i) => (
-                <path key={i} d={`M ${50 + dx - 4} ${g.top + 5} Q ${50 + dx} ${g.top - 9} ${50 + dx + 5} ${g.top + 3} Z`} />
-              ))}
-            </g>
-          ),
-        }
+        <g>
+          <path d={`M ${hx + 2} ${hy - 6.5} L ${hx - 15} ${hy - 2.5} L ${hx - 15} ${hy + 3} L ${hx + 2} ${hy + 7} Z`} fill={c.fill} {...S} />
+          <rect x={hx - 16.5} y={hy - 3} width={4} height={4} rx={1.4} fill={INK} />
+          <path d={`M ${hx - 13} ${hy + 3.2} L ${hx + 1} ${hy + 4.6}`} stroke={INK} strokeWidth={1.6} fill="none" />
+          {c.p.extras?.includes("fang") && <path d={`M ${hx - 9} ${hy + 4} l 1.8 3.4 l 1.8 -3.1 Z`} fill="#fff" stroke={INK} strokeWidth={1.2} strokeLinejoin="round" />}
+        </g>
       );
-    case "back:frill":
-      return {
-        behind: (
-          <path d={`M 24 ${g.eyeY} Q 26 ${g.top - 14} 50 ${g.top - 16} Q 74 ${g.top - 14} 76 ${g.eyeY} Q 63 ${g.top + 4} 50 ${g.top + 3} Q 37 ${g.top + 4} 24 ${g.eyeY} Z`} fill={darken(base, 0.16)} {...S} />
-        ),
-      };
-    case "back:shellRim":
-      return { behind: <ellipse cx={50} cy={g.cy + 2} rx={g.rx + 4} ry={g.ry - 2} fill={darken(base, 0.25)} {...S} /> };
-    case "back:peacock":
-      return {
-        behind: (
-          <g>
-            {[-2, -1, 0, 1, 2].map((i) => (
-              <g key={i} transform={`rotate(${i * 22} 50 ${g.cy + 6})`}>
-                <ellipse cx={50} cy={g.top - 12} rx={7} ry={16} fill={darken(base, 0.15)} {...S} />
-                <circle cx={50} cy={g.top - 17} r={3.4} fill={TECH} stroke={INK} strokeWidth={1.6} />
-              </g>
-            ))}
-          </g>
-        ),
-      };
-    case "back:spikesAround":
-      return {
-        behind: (
-          <g fill={darken(base, 0.2)} {...S}>
-            {Array.from({ length: 10 }, (_, i) => {
-              const a = (i / 10) * Math.PI * 2 + 0.3;
-              const cx = 50 + Math.cos(a) * (g.rx + 1);
-              const cyy = g.cy + Math.sin(a) * (g.ry + 1) * 0.9;
-              const tx = 50 + Math.cos(a) * (g.rx + 9);
-              const ty = g.cy + Math.sin(a) * (g.ry + 9) * 0.9;
-              return <path key={i} d={`M ${cx - 2.5} ${cyy} L ${tx} ${ty} L ${cx + 2.5} ${cyy} Z`} />;
-            })}
-          </g>
-        ),
-      };
-    /* ---- 얼굴 디테일 ---- */
-    case "face:whiskers":
-      return {
-        front: (
-          <g stroke={INK} strokeWidth={1.4} strokeLinecap="round" opacity={0.7}>
-            <line x1={34} y1={g.mouthY - 4} x2={23} y2={g.mouthY - 7} />
-            <line x1={34} y1={g.mouthY} x2={22} y2={g.mouthY} />
-            <line x1={66} y1={g.mouthY - 4} x2={77} y2={g.mouthY - 7} />
-            <line x1={66} y1={g.mouthY} x2={78} y2={g.mouthY} />
-          </g>
-        ),
-      };
-    case "face:teeth":
-      return { front: <rect x={47.2} y={g.mouthY + 1} width={5.6} height={5} rx={1.4} fill="#fff" stroke={INK} strokeWidth={1.6} /> };
-    case "face:fangs":
+    case "dog":
       return (
-        {
-          front: (
-            <g fill="#fff" stroke={INK} strokeWidth={1.4} strokeLinejoin="round">
-              <path d={`M 43.5 ${g.mouthY + 0.5} l 2.4 4.6 l 2.2 -4.4 Z`} />
-              <path d={`M 52 ${g.mouthY + 0.7} l 2.3 4.4 l 2.3 -4.6 Z`} />
-            </g>
-          ),
-        }
+        <g>
+          <path d={`M ${hx + 2} ${hy - 5.5} Q ${hx - 12} ${hy - 6} ${hx - 12} ${hy} Q ${hx - 12} ${hy + 6} ${hx + 2} ${hy + 6.5} Z`} fill={c.fill} {...S} />
+          <ellipse cx={hx - 10.5} cy={hy - 1.5} rx={2.4} ry={2} fill={INK} />
+        </g>
       );
-    case "face:patch":
-      return {
-        front: (
-          <>
-            <ellipse cx={50 - g.eyeDx} cy={g.eyeY} rx={g.eyeR + 3.6} ry={g.eyeR + 4.6} fill={darken(base, 0.42)} opacity={0.85} transform={`rotate(-14 ${50 - g.eyeDx} ${g.eyeY})`} />
-            <ellipse cx={50 + g.eyeDx} cy={g.eyeY} rx={g.eyeR + 3.6} ry={g.eyeR + 4.6} fill={darken(base, 0.42)} opacity={0.85} transform={`rotate(14 ${50 + g.eyeDx} ${g.eyeY})`} />
-          </>
-        ),
-      };
-    case "face:mask":
-      return { front: <path d={`M ${50 - g.rx + 4} ${g.eyeY - 6} Q 50 ${g.eyeY - 10} ${50 + g.rx - 4} ${g.eyeY - 6} L ${50 + g.rx - 6} ${g.eyeY + 6} Q 50 ${g.eyeY + 10} ${50 - g.rx + 6} ${g.eyeY + 6} Z`} fill={darken(base, 0.4)} opacity={0.8} /> };
-    case "face:monkey":
-      return { front: <path d={`M ${50 - g.eyeDx - 7} ${g.eyeY - 6} Q 50 ${g.eyeY - 12} ${50 + g.eyeDx + 7} ${g.eyeY - 6} Q ${50 + g.eyeDx + 8} ${g.mouthY + 5} 50 ${g.mouthY + 7} Q ${50 - g.eyeDx - 8} ${g.mouthY + 5} ${50 - g.eyeDx - 7} ${g.eyeY - 6} Z`} fill={lighten(base, 0.4)} opacity={0.95} /> };
-    case "face:pouch":
-      return {
-        front: (
-          <>
-            <circle cx={50 - g.eyeDx - 7} cy={g.mouthY - 1} r={6} fill={lighten(base, 0.28)} opacity={0.95} />
-            <circle cx={50 + g.eyeDx + 7} cy={g.mouthY - 1} r={6} fill={lighten(base, 0.28)} opacity={0.95} />
-          </>
-        ),
-      };
-    case "face:spots":
+    case "cat":
       return (
-        {
-          front: (
-            <g fill={darken(base, 0.35)} opacity={0.75}>
-              <ellipse cx={33} cy={g.cy - 8} rx={5.5} ry={4} />
-              <ellipse cx={66} cy={g.cy + 6} rx={4.6} ry={3.6} />
-              <ellipse cx={40} cy={g.cy + 14} rx={3.6} ry={2.8} />
-            </g>
-          ),
-        }
+        <g>
+          <path d={`M ${hx + 2} ${hy - 4.5} Q ${hx - 8.5} ${hy - 5} ${hx - 8.5} ${hy + 0.5} Q ${hx - 8.5} ${hy + 5} ${hx + 2} ${hy + 5.5} Z`} fill={c.fill} {...S} />
+          <path d={`M ${hx - 8.5} ${hy - 0.5} l -2.4 -0.8 M ${hx - 8.5} ${hy + 1.5} l -2.4 0.8`} stroke={INK} strokeWidth={1.4} strokeLinecap="round" />
+          <path d={`M ${hx - 6.5} ${hy - 1.8} l 2.4 -1 l 2.4 1`} fill="none" stroke={INK} strokeWidth={1.4} />
+        </g>
       );
-    case "face:tear":
-      return {
-        front: (
-          <g stroke={darken(base, 0.45)} strokeWidth={2} strokeLinecap="round" fill="none" opacity={0.85}>
-            <path d={`M ${50 - g.eyeDx} ${g.eyeY + g.eyeR + 1} q -2 4 -4 6`} />
-            <path d={`M ${50 + g.eyeDx} ${g.eyeY + g.eyeR + 1} q 2 4 4 6`} />
-          </g>
-        ),
-      };
-    case "face:stripes":
-      return {
-        front: (
-          <g fill={darken(base, 0.42)} opacity={0.85}>
-            {[0, 1].map((i) => (
-              <path key={i} d={`M ${24 + i * 3} ${g.eyeY - 6 + i * 9} q 7 -2 9 2 q -7 2 -9 -2 Z`} />
-            ))}
-            {[0, 1].map((i) => (
-              <path key={`r${i}`} d={`M ${76 - i * 3} ${g.eyeY - 6 + i * 9} q -7 -2 -9 2 q 7 2 9 -2 Z`} />
-            ))}
-            <path d={`M 44 ${g.top + 3} q 6 -3 12 0 q -6 3 -12 0 Z`} />
-          </g>
-        ),
-      };
-    case "face:brow":
+    case "horse":
       return (
-        {
-          front: (
-            <g stroke={INK} strokeWidth={2.6} strokeLinecap="round">
-              <line x1={50 - g.eyeDx - 5} y1={g.eyeY - g.eyeR - 4.5} x2={50 - g.eyeDx + 4} y2={g.eyeY - g.eyeR - 1.5} />
-              <line x1={50 + g.eyeDx + 5} y1={g.eyeY - g.eyeR - 4.5} x2={50 + g.eyeDx - 4} y2={g.eyeY - g.eyeR - 1.5} />
-            </g>
-          ),
-        }
+        <g>
+          <path d={`M ${hx + 3} ${hy - 7} L ${hx - 12} ${hy + 1} Q ${hx - 14} ${hy + 4} ${hx - 10} ${hy + 6} L ${hx + 3} ${hy + 7} Z`} fill={c.fill} {...S} />
+          <circle cx={hx - 9.5} cy={hy + 3} r={1.2} fill={INK} />
+        </g>
       );
-    case "face:discs":
-      return {
-        front: (
-          <>
-            <circle cx={50 - g.eyeDx} cy={g.eyeY} r={g.eyeR + 4.4} fill={lighten(base, 0.42)} stroke={darken(base, 0.2)} strokeWidth={1.8} />
-            <circle cx={50 + g.eyeDx} cy={g.eyeY} r={g.eyeR + 4.4} fill={lighten(base, 0.42)} stroke={darken(base, 0.2)} strokeWidth={1.8} />
-          </>
-        ),
-      };
-    case "face:belly":
-      return { front: <ellipse cx={50} cy={g.cy + 7} rx={g.rx * 0.6} ry={g.ry * 0.62} fill="#f4f5f8" stroke="none" /> };
-    case "face:orca":
-      return {
-        front: (
-          <>
-            <ellipse cx={50 - g.eyeDx - 3} cy={g.eyeY - 5} rx={5} ry={3} fill="#f4f5f8" transform={`rotate(-18 ${50 - g.eyeDx - 3} ${g.eyeY - 5})`} />
-            <ellipse cx={50 + g.eyeDx + 3} cy={g.eyeY - 5} rx={5} ry={3} fill="#f4f5f8" transform={`rotate(18 ${50 + g.eyeDx + 3} ${g.eyeY - 5})`} />
-            <ellipse cx={50} cy={g.cy + 10} rx={g.rx * 0.55} ry={g.ry * 0.45} fill="#f4f5f8" stroke="none" />
-          </>
-        ),
-      };
-    case "face:grin":
-      return {
-        front: (
-          <g>
-            <path d={`M 38 ${g.mouthY - 1} Q 50 ${g.mouthY + 6} 62 ${g.mouthY - 1}`} fill="none" stroke={INK} strokeWidth={2.4} strokeLinecap="round" />
-            <path d={`M 41 ${g.mouthY + 0.5} l 2.5 3.5 l 2.5 -3 l 2.5 3 l 2.5 -3 l 2.5 3 l 2.5 -3 l 2.5 3 l 2.5 -3.5`} fill="none" stroke="#fff" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
-          </g>
-        ),
-      };
-    case "face:gills":
-      return {
-        front: (
-          <g stroke={darken(base, 0.3)} strokeWidth={1.8} strokeLinecap="round" fill="none" opacity={0.8}>
-            <path d={`M ${L + 6} ${g.cy - 4} q 3 4 0 8 M ${L + 11} ${g.cy - 4} q 3 4 0 8`} />
-            <path d={`M ${R - 6} ${g.cy - 4} q -3 4 0 8 M ${R - 11} ${g.cy - 4} q -3 4 0 8`} />
-          </g>
-        ),
-      };
-    case "face:lips":
-      return {
-        front: (
-          <>
-            <ellipse cx={50} cy={g.mouthY} rx={5} ry={3.4} fill={darken(base, 0.25)} {...S} />
-            <ellipse cx={50} cy={g.mouthY} rx={2} ry={1.3} fill={INK} />
-          </>
-        ),
-      };
-    case "face:mounts":
-      return {
-        behind: (
-          <>
-            <circle cx={50 - g.eyeDx - 1} cy={g.eyeY + 1} r={8} fill={fill} {...S} />
-            <circle cx={50 + g.eyeDx + 1} cy={g.eyeY + 1} r={8} fill={fill} {...S} />
-          </>
-        ),
-      };
-    case "face:wide":
-      return { front: <path d={`M 37 ${g.mouthY} Q 50 ${g.mouthY + 8} 63 ${g.mouthY}`} fill="none" stroke={INK} strokeWidth={2.6} strokeLinecap="round" /> };
-    case "face:tongue":
-      return {
-        front: (
-          <g stroke="#d95f6e" strokeWidth={2.2} strokeLinecap="round" fill="none">
-            <path d={`M 50 ${g.mouthY} q 0 5 0 7 M 50 ${g.mouthY + 7} l -2.6 3 M 50 ${g.mouthY + 7} l 2.6 3`} />
-          </g>
-        ),
-      };
-    case "face:scales":
-      return {
-        front: (
-          <g fill="none" stroke={darken(base, 0.28)} strokeWidth={1.7} opacity={0.85}>
-            <path d={`M 42 ${g.plateCy - 12} Q 50 ${g.plateCy - 8} 58 ${g.plateCy - 12}`} />
-            <path d={`M 41 ${g.plateCy - 6} Q 50 ${g.plateCy - 2} 59 ${g.plateCy - 6}`} />
-          </g>
-        ),
-      };
-    case "face:cones":
-      return {
-        front: (
-          <>
-            <circle cx={50 - g.eyeDx} cy={g.eyeY} r={g.eyeR + 3.4} fill="none" stroke={darken(base, 0.25)} strokeWidth={2.4} />
-            <circle cx={50 + g.eyeDx} cy={g.eyeY} r={g.eyeR + 3.4} fill="none" stroke={darken(base, 0.25)} strokeWidth={2.4} />
-          </>
-        ),
-      };
-    case "face:shell":
-      return {
-        front: (
-          <g>
-            <ellipse cx={50} cy={g.plateCy - 2} rx={19} ry={13.5} fill="#caa25a" stroke={INK} strokeWidth={2.2} />
-            <path
-              d={`M 32 ${g.plateCy - 2} H 68 M 50 ${g.plateCy - 15} V ${g.plateCy + 11} M 38 ${g.plateCy - 11} L 62 ${g.plateCy + 8} M 62 ${g.plateCy - 11} L 38 ${g.plateCy + 8}`}
-              stroke="#8f7136"
-              strokeWidth={1.6}
-              fill="none"
-              opacity={0.9}
-            />
-          </g>
-        ),
-      };
+    case "block":
+      return (
+        <g>
+          <rect x={hx - 13} y={hy - 5} width={15} height={11} rx={3.5} fill={c.fill} {...S} />
+          <circle cx={hx - 9.5} cy={hy + 1} r={1.3} fill={INK} />
+        </g>
+      );
+    case "pig":
+      return (
+        <g>
+          <rect x={hx - 11} y={hy - 4.5} width={13} height={10} rx={3.5} fill={c.fill} {...S} />
+          <ellipse cx={hx - 11} cy={hy + 0.5} rx={3.4} ry={4.2} fill={lighten(c.base, 0.25)} {...S} strokeWidth={1.8} />
+          <circle cx={hx - 12} cy={hy - 0.8} r={1} fill={darken(c.base, 0.4)} />
+          <circle cx={hx - 12} cy={hy + 1.8} r={1} fill={darken(c.base, 0.4)} />
+        </g>
+      );
+    case "croc":
+      return (
+        <g>
+          <rect x={hx - 22} y={hy - 3} width={25} height={9} rx={3.5} fill={c.fill} {...S} />
+          <path d={`M ${hx - 20} ${hy + 6} l 2.4 -2.8 l 2.4 2.8 l 2.4 -2.8 l 2.4 2.8 l 2.4 -2.8 l 2.4 2.8`} fill="none" stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx={hx - 19} cy={hy - 0.8} r={1.2} fill={INK} />
+        </g>
+      );
+    case "trunk":
+      return (
+        <path d={`M ${hx - 4} ${hy - 2} Q ${hx - 14} ${hy + 2} ${hx - 13} ${hy + 14} Q ${hx - 13} ${hy + 20} ${hx - 8} ${hy + 20} Q ${hx - 10} ${hy + 14} ${hx - 7} ${hy + 8} Q ${hx - 5} ${hy + 3} ${hx + 2} ${hy + 4} Z`} fill={c.fill} {...S} />
+      );
     default:
-      return {};
+      return null;
   }
 }
 
-/* ---------- 바디 ---------- */
-
-function renderBody(kind: BodyKind, g: Geom, fill: string, base: string): ReactNode {
-  if (kind === "neck")
-    return (
-      <>
-        <ellipse cx={50} cy={g.cy} rx={g.rx} ry={g.ry} fill={fill} {...S} strokeWidth={2.4} />
-        <rect x={43.5} y={15} width={13} height={58} rx={6.5} fill={fill} {...S} strokeWidth={2.4} />
-        <circle cx={50} cy={21} r={11.5} fill={fill} {...S} strokeWidth={2.4} />
-        <ellipse cx={50} cy={g.cy + 4} rx={g.rx * 0.55} ry={g.ry * 0.55} fill="#ffffff" opacity={0.2} />
-      </>
-    );
-  if (kind === "snake")
-    return (
-      <>
-        <ellipse cx={50} cy={81} rx={26} ry={9.5} fill={fill} {...S} strokeWidth={2.4} />
-        <ellipse cx={50} cy={70} rx={20} ry={8.5} fill={fill} {...S} strokeWidth={2.4} />
-        <ellipse cx={50} cy={49} rx={14} ry={12} fill={fill} {...S} strokeWidth={2.4} />
-        <rect x={42} y={56} width={16} height={10} fill={fill} stroke="none" />
-      </>
-    );
-  if (kind === "jelly")
-    return (
-      <path
-        d={`M 24 54 A 26 25 0 1 1 76 54 L 76 60 Q 69.5 65 63 60 Q 56.5 65 50 60 Q 43.5 65 37 60 Q 30.5 65 24 60 Z`}
-        fill={fill}
-        {...S}
-        strokeWidth={2.4}
-      />
-    );
-  return <ellipse cx={50} cy={g.cy} rx={g.rx} ry={g.ry} fill={fill} {...S} strokeWidth={2.4} />;
+function earOf(kind: string, hx: number, hy: number, r: number, c: Ctx): ReactNode {
+  const top = hy - r;
+  switch (kind) {
+    case "point":
+      return <path d={`M ${hx - 2} ${top + 3} L ${hx + 1} ${top - 8} L ${hx + 9} ${top + 4} Z`} fill={c.fill} {...S} />;
+    case "bigpoint":
+      return (
+        <g>
+          <path d={`M ${hx - 3} ${top + 3} L ${hx - 1} ${top - 12} L ${hx + 9} ${top + 4} Z`} fill={c.fill} {...S} />
+          <path d={`M ${hx - 0.5} ${top + 1} L ${hx + 0.5} ${top - 6} L ${hx + 5.5} ${top + 2} Z`} fill={c.dark} stroke="none" />
+        </g>
+      );
+    case "round":
+      return (
+        <g>
+          <circle cx={hx + 3} cy={top - 1} r={5.5} fill={c.fill} {...S} />
+          <circle cx={hx + 3} cy={top - 1} r={2.6} fill={c.dark} stroke="none" />
+        </g>
+      );
+    case "floppy":
+      return <ellipse cx={hx + 5} cy={top + 4} rx={4.5} ry={8} fill={c.fill} {...S} transform={`rotate(28 ${hx + 5} ${top + 4})`} />;
+    case "long":
+      return (
+        <g>
+          <rect x={hx - 2} y={top - 20} width={8} height={24} rx={4} fill={c.fill} {...S} transform={`rotate(6 ${hx + 2} ${top})`} />
+          <rect x={hx} y={top - 16} width={4} height={17} rx={2} fill={c.dark} stroke="none" transform={`rotate(6 ${hx + 2} ${top})`} />
+        </g>
+      );
+    case "side":
+      return <ellipse cx={hx + 8} cy={top + 4} rx={5.5} ry={3.4} fill={c.fill} {...S} transform={`rotate(18 ${hx + 8} ${top + 4})`} />;
+    case "huge":
+      return (
+        <g>
+          <ellipse cx={hx + 10} cy={hy - 2} rx={10} ry={13} fill={c.fill} {...S} />
+          <ellipse cx={hx + 10} cy={hy - 2} rx={5.5} ry={8} fill={c.dark} stroke="none" />
+        </g>
+      );
+    case "tuft":
+      return (
+        <g>
+          <path d={`M ${hx - 1} ${top + 3} L ${hx + 1} ${top - 6} L ${hx + 8} ${top + 3} Z`} fill={c.fill} {...S} />
+          <path d={`M ${hx + 1} ${top - 5} q -1 -3 1 -5`} stroke={INK} strokeWidth={1.8} fill="none" strokeLinecap="round" />
+        </g>
+      );
+    case "fluff":
+      return (
+        <g fill={c.fill}>
+          <circle cx={hx + 2} cy={top} r={6} {...S} />
+          <circle cx={hx + 7} cy={top + 2} r={4.5} {...S} />
+        </g>
+      );
+    case "big":
+      return (
+        <g>
+          <circle cx={hx + 3} cy={top - 3} r={7.5} fill={c.fill} {...S} />
+          <circle cx={hx + 3} cy={top - 3} r={4} fill={c.dark} stroke="none" />
+        </g>
+      );
+    default:
+      return null;
+  }
 }
 
-/* ---------- 로봇 공통 레이어 ---------- */
+function tailOf(kind: string, tx: number, ty: number, c: Ctx): ReactNode {
+  switch (kind) {
+    case "bushy":
+      return <path d={`M ${tx - 3} ${ty + 3} Q ${tx + 13} ${ty - 2} ${tx + 12} ${ty - 16} Q ${tx + 5} ${ty - 13} ${tx + 2} ${ty - 5} Q ${tx - 1} ${ty} ${tx - 3} ${ty + 3} Z`} fill={c.fill} {...S} />;
+    case "tipped":
+      return (
+        <g>
+          <path d={`M ${tx - 3} ${ty + 3} Q ${tx + 14} ${ty} ${tx + 13} ${ty - 16} Q ${tx + 5} ${ty - 13} ${tx + 2} ${ty - 5} Z`} fill={c.fill} {...S} />
+          <path d={`M ${tx + 9} ${ty - 9} Q ${tx + 13} ${ty - 12} ${tx + 13} ${ty - 16} Q ${tx + 9} ${ty - 14} ${tx + 7} ${ty - 11} Z`} fill="#f4f5f8" stroke="none" />
+        </g>
+      );
+    case "up":
+      return <path d={`M ${tx} ${ty} Q ${tx + 9} ${ty - 6} ${tx + 7} ${ty - 17}`} fill="none" stroke={c.base} strokeWidth={4.6} strokeLinecap="round" />;
+    case "flow":
+      return <path d={`M ${tx} ${ty - 2} Q ${tx + 12} ${ty} ${tx + 10} ${ty + 16} Q ${tx + 7} ${ty + 22} ${tx + 3} ${ty + 22} Q ${tx + 6} ${ty + 12} ${tx + 2} ${ty + 4} Z`} fill={c.dark} {...S} />;
+    case "stub":
+      return <ellipse cx={tx + 2} cy={ty} rx={3.4} ry={4.4} fill={c.fill} {...S} />;
+    case "thin":
+      return <path d={`M ${tx} ${ty} Q ${tx + 12} ${ty + 2} ${tx + 15} ${ty + 12}`} fill="none" stroke={INK} strokeWidth={2.6} strokeLinecap="round" />;
+    case "curl":
+      return <path d={`M ${tx} ${ty} q 6 -2 6 3 q 0 4 -4 3`} fill="none" stroke={c.base} strokeWidth={3} strokeLinecap="round" />;
+    case "spade":
+      return (
+        <g>
+          <path d={`M ${tx} ${ty} Q ${tx + 13} ${ty + 2} ${tx + 16} ${ty - 8}`} fill="none" stroke={c.base} strokeWidth={4} strokeLinecap="round" />
+          <path d={`M ${tx + 13} ${ty - 12} l 6 2 l -4 6 Z`} fill={c.dark} {...S} strokeWidth={1.8} />
+        </g>
+      );
+    case "spike":
+      return (
+        <g>
+          <path d={`M ${tx - 2} ${ty - 3} Q ${tx + 16} ${ty - 1} ${tx + 19} ${ty + 7}`} fill="none" stroke={c.base} strokeWidth={6} strokeLinecap="round" />
+          <path d={`M ${tx + 14} ${ty + 1} l 3 -5 l 2 5 Z M ${tx + 18} ${ty + 5} l 4 -4 l 1 5 Z`} fill={METAL} stroke={INK} strokeWidth={1.4} strokeLinejoin="round" />
+        </g>
+      );
+    case "thick":
+      return <path d={`M ${tx - 2} ${ty - 4} Q ${tx + 16} ${ty} ${tx + 20} ${ty + 10} L ${tx + 12} ${ty + 12} Q ${tx + 6} ${ty + 4} ${tx - 2} ${ty + 4} Z`} fill={c.fill} {...S} />;
+    case "tuftTail":
+      return (
+        <g>
+          <path d={`M ${tx} ${ty} Q ${tx + 10} ${ty - 4} ${tx + 9} ${ty - 14}`} fill="none" stroke={c.base} strokeWidth={2.8} strokeLinecap="round" />
+          <circle cx={tx + 9} cy={ty - 16} r={3.4} fill={c.dark} {...S} strokeWidth={1.6} />
+        </g>
+      );
+    case "ring":
+      return (
+        <g>
+          <path d={`M ${tx - 2} ${ty + 2} Q ${tx + 14} ${ty} ${tx + 13} ${ty - 15}`} fill="none" stroke={c.base} strokeWidth={6} strokeLinecap="round" />
+          <path d={`M ${tx + 7} ${ty - 4} l 6 -1 M ${tx + 9} ${ty - 9} l 5.5 -1`} stroke={INK} strokeWidth={2.2} strokeLinecap="round" />
+        </g>
+      );
+    case "flat":
+      return <path d={`M ${tx - 2} ${ty} Q ${tx + 14} ${ty + 2} ${tx + 18} ${ty + 8} Q ${tx + 12} ${ty + 12} ${tx + 4} ${ty + 8} Z`} fill={c.dark} {...S} />;
+    case "bigbush":
+      return (
+        <g>
+          <path d={`M ${tx - 4} ${ty + 4} Q ${tx + 16} ${ty + 2} ${tx + 14} ${ty - 22} Q ${tx + 10} ${ty - 34} ${tx - 2} ${ty - 30} Q ${tx + 6} ${ty - 22} ${tx + 4} ${ty - 12} Q ${tx + 2} ${ty - 4} ${tx - 4} ${ty + 4} Z`} fill={c.fill} {...S} />
+          <path d={`M ${tx + 7} ${ty - 8} Q ${tx + 10} ${ty - 16} ${tx + 6} ${ty - 24}`} fill="none" stroke={c.dark} strokeWidth={2} strokeLinecap="round" />
+        </g>
+      );
+    case "puff":
+      return <circle cx={tx + 3} cy={ty} r={4.4} fill="#f4f5f8" {...S} strokeWidth={1.8} />;
+    case "spiral":
+      return <path d={`M ${tx} ${ty} q 10 2 9 8 q -1 5 -6 4 q -4 -1 -3 -5`} fill="none" stroke={c.base} strokeWidth={3.4} strokeLinecap="round" />;
+    default:
+      return null;
+  }
+}
 
-function RobotLayer({ g, base }: { g: Geom; base: string }) {
-  const px = 50 - g.plateW / 2;
-  return (
+/* ---------- 부가 요소 ---------- */
+
+function extrasOf(extras: readonly string[] | undefined, layer: "behind" | "front", box: { hx: number; hy: number; hr: number; bx: number; by: number; bw: number }, c: Ctx): ReactNode {
+  if (!extras?.length) return null;
+  const { hx, hy, hr, bx, by, bw } = box;
+  const out: ReactNode[] = [];
+  for (const e of extras) {
+    if (layer === "behind") {
+      if (e === "mane")
+        out.push(
+          <g key={e} fill={c.dark}>
+            {[0, 1, 2, 3].map((i) => (
+              <path key={i} d={`M ${hx + 4 + i * 3} ${hy - hr + 2 + i * 4} L ${hx + 12 + i * 3} ${hy - hr - 6 + i * 4} L ${hx + 13 + i * 3} ${hy - hr + 6 + i * 4} Z`} {...S} strokeWidth={1.8} />
+            ))}
+          </g>,
+        );
+      if (e === "antler")
+        out.push(
+          <g key={e} fill="none" stroke="#9c8862" strokeWidth={3} strokeLinecap="round">
+            <path d={`M ${hx + 2} ${hy - hr + 1} Q ${hx + 1} ${hy - hr - 12} ${hx + 8} ${hy - hr - 16} M ${hx + 2} ${hy - hr - 7} L ${hx - 4} ${hy - hr - 12}`} />
+          </g>,
+        );
+      if (e === "hornsBack") out.push(<path key={e} d={`M ${hx + 3} ${hy - hr + 2} Q ${hx + 9} ${hy - hr - 10} ${hx + 16} ${hy - hr - 8} Q ${hx + 10} ${hy - hr - 2} ${hx + 8} ${hy - hr + 4} Z`} fill="#d8d2c2" {...S} />);
+      if (e === "hornsSmall") out.push(<path key={e} d={`M ${hx + 2} ${hy - hr + 2} q -1 -7 4 -8 q 2 4 0 8 Z`} fill="#e8e2d2" {...S} strokeWidth={1.8} />);
+      if (e === "horn3")
+        out.push(
+          <g key={e} fill="#eee7d8" {...S} strokeWidth={1.8}>
+            <path d={`M ${hx - 2} ${hy - hr + 2} L ${hx} ${hy - hr - 9} L ${hx + 5} ${hy - hr + 2} Z`} />
+            <path d={`M ${hx + 6} ${hy - hr + 3} L ${hx + 9} ${hy - hr - 6} L ${hx + 12} ${hy - hr + 4} Z`} />
+          </g>,
+        );
+      if (e === "hornSpiral")
+        out.push(
+          <g key={e}>
+            <path d={`M ${hx - 2} ${hy - hr + 2} L ${hx + 1} ${hy - hr - 13} L ${hx + 5} ${hy - hr + 2} Z`} fill={GOLD} {...S} strokeWidth={1.8} />
+            <path d={`M ${hx - 0.5} ${hy - hr - 3} l 4 -1.4 M ${hx + 0.5} ${hy - hr - 7} l 3 -1`} stroke={darken(GOLD, 0.3)} strokeWidth={1.3} />
+          </g>,
+        );
+      if (e === "frill") out.push(<path key={e} d={`M ${hx + 2} ${hy - hr - 4} Q ${hx + 16} ${hy - hr - 10} ${hx + 20} ${hy + 4} Q ${hx + 12} ${hy + 8} ${hx + 4} ${hy + 4} Z`} fill={c.dark} {...S} />);
+      if (e === "wool")
+        out.push(
+          <g key={e} fill="#f2f0ea" {...S} strokeWidth={1.8}>
+            {[0, 1, 2, 3].map((i) => (
+              <circle key={i} cx={bx + 6 + i * 10} cy={by - 4 - (i % 2) * 3} r={6.5} />
+            ))}
+          </g>,
+        );
+      if (e === "plates")
+        out.push(
+          <g key={e} fill={c.dark} {...S} strokeWidth={1.8}>
+            {[0, 1, 2, 3].map((i) => (
+              <path key={i} d={`M ${bx + 4 + i * 11} ${by - 1} Q ${bx + 9 + i * 11} ${by - 14} ${bx + 14 + i * 11} ${by - 2} Z`} />
+            ))}
+          </g>,
+        );
+      if (e === "ridges")
+        out.push(
+          <g key={e} fill={c.dark} {...S} strokeWidth={1.6}>
+            {[0, 1, 2, 3, 4].map((i) => (
+              <path key={i} d={`M ${bx + 6 + i * 9} ${by} Q ${bx + 10 + i * 9} ${by - 6} ${bx + 14 + i * 9} ${by} Z`} />
+            ))}
+          </g>,
+        );
+      if (e === "wings")
+        out.push(
+          <path key={e} d={`M ${bx + bw * 0.35} ${by - 2} Q ${bx + bw * 0.15} ${by - 26} ${bx + bw * 0.7} ${by - 22} Q ${bx + bw * 0.95} ${by - 19} ${bx + bw * 0.8} ${by - 2} L ${bx + bw * 0.62} ${by - 8} Z`} fill={c.p.extras?.includes("mane") ? "#f4f5f8" : c.dark} {...S} />,
+        );
+      if (e === "ninetails")
+        out.push(
+          <g key={e}>
+            {[0, 1, 2, 3, 4].map((i) => (
+              <g key={i} transform={`rotate(${-10 + i * 16} ${bx + bw - 4} ${by + 10})`}>
+                <path d={`M ${bx + bw - 6} ${by + 8} Q ${bx + bw + 12} ${by} ${bx + bw + 16} ${by - 18} Q ${bx + bw + 6} ${by - 14} ${bx + bw + 2} ${by - 2} Z`} fill={c.fill} {...S} strokeWidth={1.8} />
+                <path d={`M ${bx + bw + 11} ${by - 11} Q ${bx + bw + 15} ${by - 15} ${bx + bw + 16} ${by - 18} Q ${bx + bw + 12} ${by - 17} ${bx + bw + 10} ${by - 14} Z`} fill="#f4f5f8" stroke="none" />
+              </g>
+            ))}
+          </g>,
+        );
+    } else {
+      if (e === "stripes")
+        out.push(
+          <g key={e} fill={darken(c.base, 0.45)} opacity={0.9}>
+            {[0, 1, 2].map((i) => (
+              <path key={i} d={`M ${bx + 10 + i * 12} ${by + 2} q 3 6 0 12 l 4 0 q 3 -6 0 -12 Z`} />
+            ))}
+          </g>,
+        );
+      if (e === "spots")
+        out.push(
+          <g key={e} fill={darken(c.base, 0.4)} opacity={0.8}>
+            <ellipse cx={bx + 12} cy={by + 8} rx={3.6} ry={2.8} />
+            <ellipse cx={bx + 26} cy={by + 13} rx={3} ry={2.4} />
+            <ellipse cx={bx + 36} cy={by + 6} rx={2.6} ry={2} />
+          </g>,
+        );
+      if (e === "tear") out.push(<path key={e} d={`M ${hx - 2} ${hy + 3} q -1 3 -3 5`} fill="none" stroke={darken(c.base, 0.45)} strokeWidth={1.8} strokeLinecap="round" />);
+      if (e === "whiskers")
+        out.push(
+          <g key={e} stroke={INK} strokeWidth={1.2} strokeLinecap="round" opacity={0.75}>
+            <path d={`M ${hx - 6} ${hy + 2} l -7 1 M ${hx - 6} ${hy + 4.5} l -6.5 3`} />
+          </g>,
+        );
+      if (e === "beard") out.push(<path key={e} d={`M ${hx - 8} ${hy + 5} q 1 6 4 7 q 1 -4 0.5 -7 Z`} fill="#f2f0ea" {...S} strokeWidth={1.6} />);
+    }
+  }
+  return <g>{out}</g>;
+}
+
+/* ---------- 리그들 ---------- */
+
+interface RigOut {
+  jsx: ReactNode;
+  a: Anchors;
+}
+
+function rigQuad(c: Ctx): RigOut {
+  const low = !!c.p.low;
+  const longNeck = !!c.p.longNeck;
+  const by = low ? 56 : 46; // 몸 윗면
+  const bh = low ? 18 : 24;
+  const bx = low ? 26 : 30;
+  const bw = low ? 54 : 48;
+  const hx = longNeck ? 27 : 22;
+  const hy = longNeck ? 20 : low ? 52 : 36;
+  const hr = longNeck ? 8 : 10;
+  const legTop = by + bh - 6;
+  const eyePos: [number, number] = [hx + 2, hy - 1.5];
+
+  const jsx = (
     <g>
-      <path
-        d={`M ${50 - g.rx + 6} ${g.cy - g.ry + 10} Q ${50 - g.rx + 2} ${g.cy} ${50 - g.rx + 7} ${g.cy + g.ry - 10}`}
-        fill="none"
-        stroke={darken(base, 0.28)}
-        strokeWidth={1.6}
-        opacity={0.55}
-      />
-      <path
-        d={`M ${50 + g.rx - 6} ${g.cy - g.ry + 10} Q ${50 + g.rx - 2} ${g.cy} ${50 + g.rx - 7} ${g.cy + g.ry - 10}`}
-        fill="none"
-        stroke={darken(base, 0.28)}
-        strokeWidth={1.6}
-        opacity={0.55}
-      />
-      <circle cx={50 - g.rx + 4} cy={g.top + 16} r={2.4} fill={METAL_DARK} stroke={INK} strokeWidth={1.4} />
-      <circle cx={50 + g.rx - 4} cy={g.top + 16} r={2.4} fill={METAL_DARK} stroke={INK} strokeWidth={1.4} />
-      <rect x={px} y={g.plateCy - 7} width={g.plateW} height={14} rx={5} fill={METAL} stroke={INK} strokeWidth={2} />
-      <rect x={px + 2.5} y={g.plateCy - 4.5} width={g.plateW - 5} height={9} rx={3.5} fill="none" stroke={METAL_DARK} strokeWidth={1.2} />
-      <circle cx={50} cy={g.plateCy} r={3.6} fill={TECH} stroke={INK} strokeWidth={1.6} />
-      <circle cx={50} cy={g.plateCy} r={1.4} fill="#ffffff" opacity={0.9} />
+      {tailOf(c.p.tail ?? "up", bx + bw - 2, by + 8, c)}
+      {extrasOf(c.p.extras, "behind", { hx, hy, hr, bx, by, bw }, c)}
+      <Leg x={bx + bw - 8} topY={legTop} />
+      <Leg x={bx + 10} topY={legTop} />
+      {/* 뒷다리 장갑 허벅지 */}
+      <circle cx={bx + bw - 9} cy={by + bh - 5} r={11} fill={METAL} stroke={INK} strokeWidth={2.2} />
+      <path d={`M ${bx + bw - 16} ${by + bh - 9} a 9 9 0 0 1 13 -2`} fill="none" stroke={METAL_DARK} strokeWidth={1.8} />
+      <Leg x={bx + bw - 3} topY={legTop + 2} />
+      <Leg x={bx + 17} topY={legTop + 2} />
+      {/* 몸통 */}
+      <rect x={bx} y={by} width={bw} height={bh} rx={low ? 9 : 12} fill={c.fill} {...S} strokeWidth={2.4} />
+      {/* 등 장갑 밴드 + 심선 */}
+      <path d={`M ${bx + 4} ${by + 5} Q ${bx + bw / 2} ${by - 1} ${bx + bw - 4} ${by + 5}`} fill="none" stroke={METAL_DARK} strokeWidth={2.4} opacity={0.8} />
+      <path d={`M ${bx + 10} ${by + bh - 4} L ${bx + bw - 10} ${by + bh - 4}`} stroke={darken(c.base, 0.3)} strokeWidth={1.4} opacity={0.6} />
+      {/* 어깨 장갑 */}
+      <circle cx={bx + 11} cy={by + 9} r={8} fill={METAL} stroke={INK} strokeWidth={2} />
+      <circle cx={bx + 11} cy={by + 9} r={3.2} fill={METAL_DARK} />
+      {/* 목·머리 */}
+      {longNeck ? (
+        <rect x={hx - 4} y={hy} width={11} height={by - hy + 8} rx={5} fill={c.fill} {...S} strokeWidth={2.2} />
+      ) : (
+        <path d={`M ${bx + 2} ${by + 3} L ${hx + 3} ${hy - hr + 3} L ${hx + 8} ${hy + hr - 1} L ${bx + 8} ${by + bh - 4} Z`} fill={c.fill} stroke="none" />
+      )}
+      {earOf(c.p.ear ?? "point", hx, hy, hr, c)}
+      <circle cx={hx} cy={hy} r={hr} fill={c.fill} {...S} strokeWidth={2.4} />
+      {muzzleOf(c.p.muzzle ?? "wolf", hx - hr + 3, hy + 1, c)}
+      <MechEye x={eyePos[0]} y={eyePos[1]} eye={c.eye} />
+      {extrasOf(c.p.extras, "front", { hx, hy, hr, bx, by, bw }, c)}
+      <Core x={bx + bw / 2 + 2} y={by + bh / 2 + 1} />
     </g>
   );
+  return {
+    jsx,
+    a: { top: [hx + 2, hy - hr - (c.p.ear && c.p.ear !== "none" ? 10 : 2)], back: [bx + bw / 2 + 6, by - 2], core: [bx + bw / 2 + 2, by + bh / 2 + 1], eye: eyePos, feet: [[bx + 13, 84], [bx + bw - 6, 84]] },
+  };
 }
 
-function Feet({ g }: { g: Geom }) {
-  if (!g.feet) return null;
-  return (
-    <>
-      <ellipse cx={38} cy={89.5} rx={7} ry={3.6} fill={METAL_DARK} stroke={INK} strokeWidth={1.8} />
-      <ellipse cx={62} cy={89.5} rx={7} ry={3.6} fill={METAL_DARK} stroke={INK} strokeWidth={1.8} />
-    </>
+function rigSit(c: Ctx): RigOut {
+  const chunky = c.p.extras?.includes("chunky");
+  const hx = 40;
+  const hy = 34;
+  const hr = chunky ? 13 : 12;
+  const bx = 30;
+  const by = 46;
+  const bw = 34;
+  const eyePos: [number, number] = [hx - 3, hy - 1];
+
+  const jsx = (
+    <g>
+      {tailOf(c.p.tail ?? "stub", 62, 66, c)}
+      {c.p.tail === "curlLong" && <path d={`M 62 66 Q 78 62 78 48 Q 78 40 71 41`} fill="none" stroke={c.base} strokeWidth={3.4} strokeLinecap="round" />}
+      {extrasOf(c.p.extras, "behind", { hx, hy, hr, bx, by, bw }, c)}
+      {c.p.extras?.includes("spikes") && (
+        <g fill={METAL} stroke={INK} strokeWidth={1.8} strokeLinejoin="round">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <path key={i} d={`M ${42 + i * 7} ${44 - (i % 2) * 3} L ${48 + i * 7} ${30 - (i % 2) * 4} L ${52 + i * 7} ${46 - (i % 2) * 3} Z`} />
+          ))}
+        </g>
+      )}
+      {/* 엉덩이·몸 */}
+      <circle cx={56} cy={66} r={chunky ? 17 : 15} fill={c.fill} {...S} strokeWidth={2.4} />
+      <ellipse cx={44} cy={58} rx={chunky ? 17 : 15} ry={19} fill={c.fill} {...S} strokeWidth={2.4} />
+      {/* 배 플레이트 */}
+      <ellipse cx={42} cy={64} rx={9} ry={11} fill={lighten(c.base, 0.42)} stroke="none" />
+      {/* 앞발 */}
+      <rect x={31} y={68} width={6.5} height={18} rx={3.2} fill={METAL} stroke={INK} strokeWidth={1.8} />
+      <rect x={40} y={70} width={6.5} height={16} rx={3.2} fill={METAL} stroke={INK} strokeWidth={1.8} />
+      <Joint x={34} y={77} r={2.2} />
+      <Joint x={43} y={78} r={2.2} />
+      {/* 뒷발 패드 */}
+      <ellipse cx={60} cy={85} rx={10} ry={3.8} fill={METAL_DARK} stroke={INK} strokeWidth={1.8} />
+      {/* 머리 */}
+      {earOf(c.p.ear ?? "round", hx - 4, hy, hr, c)}
+      <circle cx={hx} cy={hy} r={hr} fill={c.fill} {...S} strokeWidth={2.4} />
+      {c.p.extras?.includes("patch") && <ellipse cx={hx - 4} cy={hy - 1} rx={5.5} ry={6.5} fill={darken(c.base, 0.45)} opacity={0.85} transform={`rotate(-12 ${hx - 4} ${hy - 1})`} />}
+      {c.p.extras?.includes("mask") && <path d={`M ${hx - hr + 1} ${hy - 4} Q ${hx} ${hy - 7} ${hx + hr - 1} ${hy - 4} L ${hx + hr - 2} ${hy + 3} Q ${hx} ${hy + 6} ${hx - hr + 2} ${hy + 3} Z`} fill={darken(c.base, 0.45)} opacity={0.85} />}
+      {c.p.extras?.includes("facePatch") && <ellipse cx={hx - 3} cy={hy + 1} rx={7.5} ry={8.5} fill={lighten(c.base, 0.4)} stroke="none" />}
+      {c.p.extras?.includes("frogEyes") && (
+        <g>
+          <circle cx={hx - 6} cy={hy - hr + 1} r={5.5} fill={c.fill} {...S} strokeWidth={2} />
+        </g>
+      )}
+      {c.p.extras?.includes("coneEye") && <circle cx={eyePos[0]} cy={eyePos[1]} r={7} fill="none" stroke={darken(c.base, 0.3)} strokeWidth={2.2} />}
+      {/* 주둥이·코 */}
+      {c.p.extras?.includes("bignose") ? (
+        <ellipse cx={hx - 8} cy={hy + 3} rx={4.4} ry={5.6} fill={INK} />
+      ) : (
+        <g>
+          <ellipse cx={hx - 7} cy={hy + 4.5} rx={5} ry={4} fill={lighten(c.base, 0.42)} stroke="none" />
+          <ellipse cx={hx - 9} cy={hy + 2.6} rx={2} ry={1.6} fill={INK} />
+        </g>
+      )}
+      {c.p.extras?.includes("cheek") && <circle cx={hx + 2} cy={hy + 6} r={5} fill={lighten(c.base, 0.3)} stroke="none" opacity={0.95} />}
+      {c.p.extras?.includes("teeth") && <rect x={hx - 8.5} y={hy + 7.5} width={4.4} height={4.2} rx={1.2} fill="#fff" stroke={INK} strokeWidth={1.4} />}
+      <MechEye x={c.p.extras?.includes("frogEyes") ? hx - 6 : eyePos[0]} y={c.p.extras?.includes("frogEyes") ? hy - hr + 1 : eyePos[1]} eye={c.eye} s={0.95} />
+      {extrasOf(c.p.extras, "front", { hx: hx - 4, hy, hr, bx, by, bw }, c)}
+      <Core x={44} y={64} r={3.4} />
+    </g>
   );
+  return {
+    jsx,
+    a: { top: [hx - 2, hy - hr - (c.p.ear === "long" ? 20 : 8)], back: [56, 44], core: [44, 64], eye: eyePos, feet: [[36, 85], [58, 85]] },
+  };
 }
 
-/* ---------- 레벨 장비 (로봇 업그레이드 사다리) ---------- */
+function rigBird(c: Ctx): RigOut {
+  const upright = c.p.extras?.includes("upright");
+  const longNeck = !!c.p.longNeck;
+  const hx = longNeck ? 28 : upright ? 44 : 36;
+  const hy = longNeck ? 22 : upright ? 32 : 36;
+  const hr = longNeck ? 7 : upright ? 11 : 9;
+  const bcx = upright ? 46 : 50;
+  const bcy = upright ? 58 : 58;
+  const eyePos: [number, number] = [hx - 1, hy - 1];
 
-function levelGear(level: number, g: Geom): ReactNode {
-  const items: ReactNode[] = [];
-  if (level >= 3)
-    items.push(
-      <g key="chips">
-        <rect x={50 - g.rx - 2} y={g.top + 8} width={5} height={8} rx={2} fill={METAL} stroke={INK} strokeWidth={1.6} />
-        <rect x={50 + g.rx - 3} y={g.top + 8} width={5} height={8} rx={2} fill={METAL} stroke={INK} strokeWidth={1.6} />
-      </g>,
+  const jsx = (
+    <g>
+      {/* 꼬리깃 */}
+      {c.p.extras?.includes("fanTail") ? (
+        <g>
+          {[0, 1, 2, 3, 4].map((i) => (
+            <g key={i} transform={`rotate(${-34 + i * 15} ${bcx + 12} ${bcy})`}>
+              <ellipse cx={bcx + 26} cy={bcy - 2} rx={13} ry={4.4} fill={c.dark} {...S} strokeWidth={1.8} />
+              <circle cx={bcx + 32} cy={bcy - 2} r={2.6} fill={TECH} stroke={INK} strokeWidth={1.4} />
+            </g>
+          ))}
+        </g>
+      ) : c.p.extras?.includes("flameTail") ? (
+        <g fill="#d96a3c" {...S} strokeWidth={1.8}>
+          {[0, 1, 2].map((i) => (
+            <path key={i} d={`M ${bcx + 12} ${bcy + i * 4 - 2} Q ${bcx + 30} ${bcy + i * 6 - 6} ${bcx + 34} ${bcy + i * 8 + 2} Q ${bcx + 24} ${bcy + i * 6 + 4} ${bcx + 12} ${bcy + i * 4 + 3} Z`} fill={i === 1 ? GOLD : "#d96a3c"} />
+          ))}
+        </g>
+      ) : (
+        <g fill={c.dark} {...S} strokeWidth={1.8}>
+          <path d={`M ${bcx + 10} ${bcy - 2} L ${bcx + 26} ${bcy + 2} L ${bcx + 24} ${bcy + 8} L ${bcx + 10} ${bcy + 6} Z`} />
+          <path d={`M ${bcx + 10} ${bcy + 2} L ${bcx + 23} ${bcy + 10} L ${bcx + 10} ${bcy + 9} Z`} />
+        </g>
+      )}
+      {/* 다리 */}
+      {!c.p.extras?.includes("oneLeg") && (
+        <g>
+          <line x1={bcx - 2} y1={bcy + 12} x2={bcx - 2} y2={86} stroke={INK} strokeWidth={3} strokeLinecap="round" />
+          <Joint x={bcx - 2} y={78} r={2} />
+        </g>
+      )}
+      <line x1={bcx + 6} y1={bcy + 12} x2={bcx + 6} y2={86} stroke={INK} strokeWidth={3} strokeLinecap="round" />
+      <Joint x={bcx + 6} y={78} r={2} />
+      <path d={`M ${bcx - 7} 86 L ${bcx + 12} 86`} stroke={INK} strokeWidth={2.6} strokeLinecap="round" />
+      {/* 몸 */}
+      {upright ? (
+        <ellipse cx={bcx} cy={bcy} rx={14} ry={19} fill={c.fill} {...S} strokeWidth={2.4} />
+      ) : (
+        <ellipse cx={bcx} cy={bcy} rx={17} ry={13} fill={c.fill} {...S} strokeWidth={2.4} transform={`rotate(-12 ${bcx} ${bcy})`} />
+      )}
+      {c.p.extras?.includes("belly") && <ellipse cx={bcx - 2} cy={bcy + 3} rx={8.5} ry={13} fill="#f4f5f8" stroke="none" />}
+      {/* 접힌 날개 장갑 패널 */}
+      <path d={`M ${bcx - 8} ${bcy - 6} Q ${bcx + 12} ${bcy - 10} ${bcx + 14} ${bcy + 2} Q ${bcx + 4} ${bcy + 8} ${bcx - 6} ${bcy + 3} Z`} fill={METAL} stroke={INK} strokeWidth={2} />
+      <path d={`M ${bcx - 3} ${bcy - 3} Q ${bcx + 7} ${bcy - 5} ${bcx + 10} ${bcy + 1} M ${bcx - 4} ${bcy + 1} Q ${bcx + 4} ${bcy - 1} ${bcx + 8} ${bcy + 3}`} fill="none" stroke={METAL_DARK} strokeWidth={1.4} />
+      {/* 목·머리 */}
+      {longNeck && <path d={`M ${hx - 3} ${hy + 4} Q ${hx - 5} ${hy + 18} ${bcx - 10} ${bcy - 4} L ${bcx - 2} ${bcy + 4} Q ${hx + 5} ${hy + 20} ${hx + 4} ${hy + 5} Z`} fill={c.fill} {...S} strokeWidth={2.2} />}
+      {!longNeck && !upright && <path d={`M ${hx - 2} ${hy} L ${bcx - 6} ${bcy - 6} L ${bcx + 2} ${bcy + 2} L ${hx + 6} ${hy + 6} Z`} fill={c.fill} stroke="none" />}
+      <circle cx={hx} cy={hy} r={hr} fill={c.fill} {...S} strokeWidth={2.4} />
+      {c.p.extras?.includes("discs") && <circle cx={eyePos[0]} cy={eyePos[1]} r={hr * 0.7} fill={lighten(c.base, 0.42)} stroke={darken(c.base, 0.2)} strokeWidth={1.6} />}
+      {c.p.extras?.includes("tufts") && <path d={`M ${hx - 6} ${hy - hr + 2} L ${hx - 8} ${hy - hr - 6} L ${hx - 1} ${hy - hr + 1} Z`} fill={c.fill} {...S} strokeWidth={1.8} />}
+      {c.p.extras?.includes("crest3") && (
+        <g fill="none" stroke={INK} strokeWidth={2} strokeLinecap="round">
+          <path d={`M ${hx - 3} ${hy - hr} q -2 -5 1 -7 M ${hx + 1} ${hy - hr - 1} q 0 -6 3 -7 M ${hx + 4} ${hy - hr} q 3 -4 6 -3`} />
+        </g>
+      )}
+      {c.p.extras?.includes("crestTall") && <path d={`M ${hx - 2} ${hy - hr + 1} Q ${hx - 4} ${hy - hr - 12} ${hx + 5} ${hy - hr - 10} Q ${hx + 8} ${hy - hr - 2} ${hx + 4} ${hy - hr + 2} Z`} fill={c.dark} {...S} strokeWidth={1.8} />}
+      {c.p.extras?.includes("tuftHead") && <path d={`M ${hx - 2} ${hy - hr} q -3 -5 1 -8 M ${hx + 2} ${hy - hr} q 2 -5 5 -5`} fill="none" stroke={INK} strokeWidth={1.8} strokeLinecap="round" />}
+      {c.p.extras?.includes("flameCrest") && (
+        <g fill="#d96a3c" {...S} strokeWidth={1.6}>
+          {[0, 1, 2].map((i) => (
+            <path key={i} d={`M ${hx - 4 + i * 4} ${hy - hr + 2} Q ${hx - 6 + i * 4} ${hy - hr - 8 - (i === 1 ? 4 : 0)} ${hx - 1 + i * 4} ${hy - hr - 10 - (i === 1 ? 4 : 0)} Q ${hx + 1 + i * 4} ${hy - hr - 4} ${hx + i * 4} ${hy - hr + 2} Z`} fill={i === 1 ? GOLD : "#d96a3c"} />
+          ))}
+        </g>
+      )}
+      {c.p.extras?.includes("curl") && <path d={`M ${hx - 1} ${hy - hr} Q ${hx + 2} ${hy - hr - 7} ${hx + 7} ${hy - hr - 4}`} fill="none" stroke={INK} strokeWidth={2.2} strokeLinecap="round" />}
+      {c.p.extras?.includes("brow") && <line x1={hx - 6} y1={hy - hr + 2} x2={hx + 3} y2={hy - hr + 4.5} stroke={INK} strokeWidth={2.4} strokeLinecap="round" />}
+      {/* 부리 */}
+      {c.p.beak === "flat" && (
+        <g>
+          <ellipse cx={hx - hr - 3} cy={hy + 1} rx={6} ry={3.2} fill="#d98a3a" {...S} strokeWidth={1.8} />
+          <ellipse cx={hx - hr - 2} cy={hy + 3.6} rx={4} ry={2} fill="#b56d24" {...S} strokeWidth={1.6} />
+        </g>
+      )}
+      {c.p.beak === "tiny" && <path d={`M ${hx - hr + 1} ${hy - 1} L ${hx - hr - 5} ${hy + 1} L ${hx - hr + 1} ${hy + 3} Z`} fill="#d98a3a" {...S} strokeWidth={1.6} />}
+      {c.p.beak === "tri" && <path d={`M ${hx - hr + 2} ${hy - 2} L ${hx - hr - 6} ${hy + 1.5} L ${hx - hr + 2} ${hy + 5} Z`} fill="#d98a3a" {...S} strokeWidth={1.8} />}
+      {c.p.beak === "hook" && <path d={`M ${hx - hr + 2} ${hy - 3} Q ${hx - hr - 7} ${hy - 3} ${hx - hr - 6} ${hy + 2} Q ${hx - hr - 6} ${hy + 5} ${hx - hr - 2} ${hy + 4} L ${hx - hr + 2} ${hy + 4} Z`} fill="#c8872f" {...S} strokeWidth={1.8} />}
+      {c.p.beak === "sharp" && <path d={`M ${hx - hr + 2} ${hy - 2.5} L ${hx - hr - 9} ${hy + 1} L ${hx - hr + 2} ${hy + 4} Z`} fill="#3f434c" {...S} strokeWidth={1.8} />}
+      {c.p.beak === "bent" && <path d={`M ${hx - hr + 2} ${hy - 2} Q ${hx - hr - 6} ${hy - 2} ${hx - hr - 6} ${hy + 3} Q ${hx - hr - 6} ${hy + 7} ${hx - hr - 2} ${hy + 7} L ${hx - hr - 2} ${hy + 3} Z`} fill="#e8a0a8" {...S} strokeWidth={1.8} />}
+      <MechEye x={eyePos[0]} y={eyePos[1]} eye={c.eye} s={0.85} />
+      <Core x={bcx + 1} y={bcy + (upright ? 8 : 4)} r={3.2} />
+    </g>
+  );
+  return {
+    jsx,
+    a: { top: [hx, hy - hr - 6], back: [bcx + 4, bcy - (upright ? 18 : 12)], core: [bcx + 1, bcy + (upright ? 8 : 4)], eye: eyePos, feet: [[bcx - 2, 86], [bcx + 6, 86]] },
+  };
+}
+
+function rigFish(c: Ctx): RigOut {
+  const round = c.p.extras?.includes("roundBody");
+  const wide = c.p.extras?.includes("wide");
+  const upright = c.p.extras?.includes("upright");
+  const eyePos: [number, number] = upright ? [42, 34] : [31, 52];
+
+  if (upright) {
+    /* 해마 */
+    const jsx = (
+      <g>
+        <HoverRing cx={50} cy={84} rx={16} />
+        <path d={`M 44 26 Q 58 28 58 44 Q 58 58 50 64 Q 44 68 46 74 Q 48 80 44 82 Q 36 84 38 74 Q 40 66 44 60 Q 48 54 46 44 Q 45 36 40 34 Q 38 28 44 26 Z`} fill={c.fill} {...S} strokeWidth={2.4} />
+        {c.p.extras?.includes("finBack") && <path d={`M 56 40 Q 66 42 64 52 Q 58 52 55 48 Z`} fill={c.dark} {...S} strokeWidth={1.8} />}
+        <g stroke={darken(c.base, 0.3)} strokeWidth={1.4} opacity={0.7}>
+          {[0, 1, 2, 3].map((i) => (
+            <path key={i} d={`M ${45 - i} ${46 + i * 7} q 4 1.5 7 0`} fill="none" />
+          ))}
+        </g>
+        {c.p.extras?.includes("tube") && <rect x={26} y={31} width={14} height={5} rx={2.5} fill={darken(c.base, 0.15)} {...S} strokeWidth={1.8} />}
+        <circle cx={44} cy={33} r={8} fill={c.fill} {...S} strokeWidth={2.2} />
+        <MechEye x={eyePos[0]} y={eyePos[1]} eye={c.eye} s={0.8} />
+        <Core x={50} y={52} r={3} />
+      </g>
     );
+    return { jsx, a: { top: [44, 22], back: [58, 40], core: [50, 52], eye: eyePos, feet: [] } };
+  }
+
+  const rx = round ? 19 : wide ? 30 : 26;
+  const ry = round ? 17 : wide ? 11 : 14;
+  const bcy = wide ? 60 : 55;
+  const jsx = (
+    <g>
+      <HoverRing cx={50} cy={84} rx={24} />
+      {/* 꼬리 */}
+      {c.p.extras?.includes("flowTail") ? (
+        <g fill={lighten(c.base, 0.2)} {...S} strokeWidth={1.8}>
+          <path d={`M ${48 + rx - 4} ${bcy - 2} Q ${86} ${bcy - 14} ${88} ${bcy - 2} Q ${80} ${bcy + 2} ${48 + rx} ${bcy + 2} Z`} />
+          <path d={`M ${48 + rx - 4} ${bcy + 2} Q ${86} ${bcy + 10} ${84} ${bcy + 16} Q ${74} ${bcy + 12} ${48 + rx - 2} ${bcy + 6} Z`} />
+        </g>
+      ) : c.p.extras?.includes("whipTail") ? (
+        <path d={`M ${48 + rx - 2} ${bcy} Q 90 ${bcy + 4} 94 ${bcy + 14}`} fill="none" stroke={INK} strokeWidth={2.4} strokeLinecap="round" />
+      ) : (
+        <path d={`M ${48 + rx - 3} ${bcy} L ${48 + rx + 12} ${bcy - 10} L ${48 + rx + 9} ${bcy} L ${48 + rx + 12} ${bcy + 10} Z`} fill={c.fill} {...S} strokeWidth={2.2} />
+      )}
+      {/* 몸 */}
+      {c.p.extras?.includes("sharpNose") ? (
+        <path d={`M ${48 - rx - 6} ${bcy + 1} Q ${48 - rx + 4} ${bcy - ry - 2} ${52} ${bcy - ry} Q ${48 + rx} ${bcy - ry + 4} ${48 + rx} ${bcy} Q ${48 + rx} ${bcy + ry - 2} ${50} ${bcy + ry} Q ${48 - rx + 6} ${bcy + ry - 2} ${48 - rx - 6} ${bcy + 1} Z`} fill={c.fill} {...S} strokeWidth={2.4} />
+      ) : (
+        <ellipse cx={48} cy={bcy} rx={rx} ry={ry} fill={c.fill} {...S} strokeWidth={2.4} />
+      )}
+      {c.p.extras?.includes("belly") && <path d={`M ${48 - rx + 4} ${bcy + 3} Q 48 ${bcy + ry + 1} ${48 + rx - 6} ${bcy + 4} Q 48 ${bcy + ry - 1} ${48 - rx + 4} ${bcy + 3} Z`} fill="#f4f5f8" stroke="none" />}
+      {c.p.extras?.includes("orcaPatch") && <ellipse cx={36} cy={bcy - 7} rx={4.6} ry={2.8} fill="#f4f5f8" transform={`rotate(-16 36 ${bcy - 7})`} />}
+      {/* 등지느러미 장갑 */}
+      {c.p.extras?.includes("dorsalBig") ? (
+        <path d={`M 42 ${bcy - ry + 2} Q 46 ${bcy - ry - 15} 58 ${bcy - ry - 11} Q 52 ${bcy - ry - 3} 54 ${bcy - ry + 3} Z`} fill={METAL} stroke={INK} strokeWidth={2} strokeLinejoin="round" />
+      ) : (
+        !round && !wide && <path d={`M 44 ${bcy - ry + 2} Q 48 ${bcy - ry - 8} 56 ${bcy - ry - 5} Q 52 ${bcy - ry} 54 ${bcy - ry + 3} Z`} fill={METAL} stroke={INK} strokeWidth={1.8} strokeLinejoin="round" />
+      )}
+      {/* 가슴지느러미 */}
+      <path d={`M 40 ${bcy + ry - 5} Q 34 ${bcy + ry + 6} 28 ${bcy + ry + 4} Q 33 ${bcy + ry - 2} 36 ${bcy + ry - 6} Z`} fill={c.dark} {...S} strokeWidth={1.8} />
+      {c.p.extras?.includes("gills") && (
+        <g stroke={darken(c.base, 0.3)} strokeWidth={1.6} opacity={0.8} fill="none">
+          <path d={`M 38 ${bcy - 5} q 2.6 5 0 10 M 42.5 ${bcy - 5} q 2.6 5 0 10`} />
+        </g>
+      )}
+      {c.p.extras?.includes("spikes") && (
+        <g fill={METAL} stroke={INK} strokeWidth={1.4} strokeLinejoin="round">
+          {Array.from({ length: 8 }, (_, i) => {
+            const a = (i / 8) * Math.PI * 2 + 0.4;
+            const sx = 48 + Math.cos(a) * rx;
+            const sy = bcy + Math.sin(a) * ry;
+            const txx = 48 + Math.cos(a) * (rx + 7);
+            const tyy = bcy + Math.sin(a) * (ry + 7);
+            return <path key={i} d={`M ${sx - 2} ${sy} L ${txx} ${tyy} L ${sx + 2} ${sy} Z`} />;
+          })}
+        </g>
+      )}
+      {/* 입 */}
+      {c.p.extras?.includes("teeth") ? (
+        <path d={`M ${48 - rx + 2} ${bcy + 4} l 2.6 3 l 2.6 -3 l 2.6 3 l 2.6 -3`} fill="none" stroke="#fff" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+      ) : c.p.extras?.includes("lips") ? (
+        <ellipse cx={48 - rx + 2} cy={bcy + 3} rx={2.8} ry={2} fill={darken(c.base, 0.3)} {...S} strokeWidth={1.4} />
+      ) : (
+        <path d={`M ${48 - rx + 2} ${bcy + 4} q 4 2.5 8 1`} fill="none" stroke={INK} strokeWidth={1.8} strokeLinecap="round" />
+      )}
+      <MechEye x={eyePos[0]} y={eyePos[1]} eye={c.eye} s={0.9} />
+      <Core x={52} y={bcy + 2} r={3.4} />
+    </g>
+  );
+  return { jsx, a: { top: [48, bcy - ry - (c.p.extras?.includes("dorsalBig") ? 16 : 8)], back: [58, bcy - ry - 2], core: [52, bcy + 2], eye: eyePos, feet: [] } };
+}
+
+function rigTrex(c: Ctx): RigOut {
+  const eyePos: [number, number] = [30, 32];
+  const jsx = (
+    <g>
+      <path d={`M 64 52 Q 84 56 92 66 L 84 70 Q 72 62 62 62 Z`} fill={c.fill} {...S} strokeWidth={2.2} />
+      <g fill={METAL} stroke={INK} strokeWidth={1.8} strokeLinejoin="round">
+        <path d={`M 40 26 L 46 14 L 50 26 Z M 52 28 L 58 18 L 61 30 Z`} />
+      </g>
+      <Leg x={52} topY={62} w={9} />
+      <circle cx={56} cy={58} r={13} fill={METAL} stroke={INK} strokeWidth={2.2} />
+      <Leg x={64} topY={64} w={9} />
+      {/* 몸통(기울어짐) */}
+      <ellipse cx={48} cy={46} rx={21} ry={16} fill={c.fill} {...S} strokeWidth={2.4} transform="rotate(-18 48 46)" />
+      {/* 머리 + 큰 턱 */}
+      <circle cx={32} cy={30} r={12} fill={c.fill} {...S} strokeWidth={2.4} />
+      <path d={`M 36 22 L 10 28 L 10 36 L 36 42 Z`} fill={c.fill} {...S} strokeWidth={2.2} />
+      <path d={`M 12 36 l 3 3.4 l 3 -3.4 l 3 3.4 l 3 -3.4 l 3 3.4 l 3 -3.4`} fill="none" stroke="#fff" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+      <rect x={10.5} y={29} width={3.6} height={3.6} rx={1.2} fill={INK} />
+      <line x1={24} y1={24} x2={33} y2={26} stroke={INK} strokeWidth={2.4} strokeLinecap="round" />
+      {/* 티니 암 */}
+      <path d={`M 40 48 q -6 2 -5 7`} fill="none" stroke={INK} strokeWidth={4} strokeLinecap="round" />
+      <MechEye x={eyePos[0]} y={eyePos[1]} eye={c.eye} />
+      <Core x={50} y={48} />
+    </g>
+  );
+  return { jsx, a: { top: [32, 16], back: [56, 30], core: [50, 48], eye: eyePos, feet: [[52, 84], [64, 84]] } };
+}
+
+function rigSnake(c: Ctx): RigOut {
+  const eyePos: [number, number] = [30, 40];
+  const jsx = (
+    <g>
+      <ellipse cx={52} cy={80} rx={26} ry={8.5} fill={c.fill} {...S} strokeWidth={2.4} />
+      <ellipse cx={52} cy={70} rx={20} ry={7.5} fill={c.fill} {...S} strokeWidth={2.4} />
+      <path d={`M 40 66 Q 30 60 30 48 L 40 46 Q 42 58 48 64 Z`} fill={c.fill} {...S} strokeWidth={2.4} />
+      <g stroke={darken(c.base, 0.3)} strokeWidth={1.6} opacity={0.7} fill="none">
+        <path d={`M 34 78 q 8 3 16 0 M 38 69 q 7 2.6 13 0`} />
+      </g>
+      <ellipse cx={33} cy={42} rx={11} ry={8.5} fill={c.fill} {...S} strokeWidth={2.4} />
+      <path d={`M 22.5 44 l -7 1.5 M 15.5 45.5 l -3 -2 M 15.5 45.5 l -2.6 2.6`} fill="none" stroke="#d95f6e" strokeWidth={2} strokeLinecap="round" />
+      <MechEye x={eyePos[0]} y={eyePos[1]} eye={c.eye} s={0.9} />
+      <Core x={52} y={70} r={3} />
+    </g>
+  );
+  return { jsx, a: { top: [33, 32], back: [64, 66], core: [52, 70], eye: eyePos, feet: [] } };
+}
+
+function rigTurtle(c: Ctx): RigOut {
+  const eyePos: [number, number] = [21, 55];
+  const jsx = (
+    <g>
+      <path d={`M 28 66 Q 28 40 52 40 Q 76 40 76 66 Z`} fill={c.fill} {...S} strokeWidth={2.4} />
+      <g stroke={darken(c.base, 0.3)} strokeWidth={1.6} fill="none" opacity={0.85}>
+        <path d={`M 38 66 Q 40 48 52 44 M 66 66 Q 64 48 52 44 M 32 56 H 72`} />
+      </g>
+      <rect x={26} y={64} width={52} height={7} rx={3.4} fill={METAL} stroke={INK} strokeWidth={2} />
+      <Leg x={36} topY={70} w={6.5} />
+      <Leg x={64} topY={70} w={6.5} />
+      <circle cx={22} cy={57} r={8} fill={c.fill} {...S} strokeWidth={2.2} />
+      <path d={`M 80 68 l 8 3 l -7 4 Z`} fill={c.fill} {...S} strokeWidth={1.8} />
+      <MechEye x={eyePos[0]} y={eyePos[1]} eye={c.eye} s={0.8} />
+      <Core x={52} y={56} r={3.4} />
+    </g>
+  );
+  return { jsx, a: { top: [52, 38], back: [62, 42], core: [52, 56], eye: eyePos, feet: [[36, 84], [64, 84]] } };
+}
+
+function rigBat(c: Ctx): RigOut {
+  const ptera = c.p.extras?.includes("pteraCrest");
+  const eyePos: [number, number] = [46, 42];
+  const jsx = (
+    <g>
+      <path d={`M 40 46 Q 24 30 6 34 Q 12 44 8 56 Q 20 50 26 58 Q 32 52 40 58 Z`} fill={ptera ? c.fill : darken(c.base, 0.2)} {...S} strokeWidth={2.2} />
+      <path d={`M 60 46 Q 76 30 94 34 Q 88 44 92 56 Q 80 50 74 58 Q 68 52 60 58 Z`} fill={ptera ? c.fill : darken(c.base, 0.2)} {...S} strokeWidth={2.2} />
+      <ellipse cx={50} cy={56} rx={11} ry={14} fill={c.fill} {...S} strokeWidth={2.4} />
+      <circle cx={50} cy={40} r={10.5} fill={c.fill} {...S} strokeWidth={2.4} />
+      {ptera ? (
+        <g>
+          <path d={`M 54 34 Q 64 28 68 30 Q 62 36 56 38 Z`} fill={c.dark} {...S} strokeWidth={1.8} />
+          <path d={`M 42 42 L 30 46 L 42 49 Z`} fill="#3f434c" {...S} strokeWidth={1.8} />
+        </g>
+      ) : (
+        <g>
+          <path d={`M 42 34 L 40 22 L 50 30 Z M 58 34 L 60 22 L 50 30 Z`} fill={c.fill} {...S} strokeWidth={2} />
+          <path d={`M 46 49 l 1.6 3 l 1.6 -2.8 Z M 51 49.2 l 1.6 2.8 l 1.6 -3 Z`} fill="#fff" stroke={INK} strokeWidth={1.2} strokeLinejoin="round" />
+        </g>
+      )}
+      <path d={`M 46 70 q 0 6 -3 8 M 54 70 q 0 6 3 8`} fill="none" stroke={INK} strokeWidth={2.4} strokeLinecap="round" />
+      <MechEye x={eyePos[0]} y={eyePos[1]} eye={c.eye} s={0.85} />
+      <Core x={50} y={58} r={3.2} />
+    </g>
+  );
+  return { jsx, a: { top: [50, ptera ? 26 : 20], back: [60, 34], core: [50, 58], eye: eyePos, feet: [] } };
+}
+
+function rigCrab(c: Ctx): RigOut {
+  const eyePos: [number, number] = [43, 52];
+  const jsx = (
+    <g>
+      {[0, 1, 2].map((i) => (
+        <g key={i} stroke={INK} strokeWidth={2.6} strokeLinecap="round" fill="none">
+          <path d={`M ${34 - i * 2} ${62 + i * 5} Q ${20 - i * 4} ${66 + i * 6} ${14 - i * 3} ${80}`} />
+          <path d={`M ${66 + i * 2} ${62 + i * 5} Q ${80 + i * 4} ${66 + i * 6} ${86 + i * 3} ${80}`} />
+        </g>
+      ))}
+      <path d={`M 34 50 Q 20 42 18 30 Q 12 34 14 40 Q 8 38 8 32 Q 14 22 24 28 Q 32 34 38 44 Z`} fill={c.fill} {...S} strokeWidth={2.2} />
+      <path d={`M 66 50 Q 80 42 82 30 Q 88 34 86 40 Q 92 38 92 32 Q 86 22 76 28 Q 68 34 62 44 Z`} fill={c.fill} {...S} strokeWidth={2.2} />
+      <ellipse cx={50} cy={60} rx={21} ry={13} fill={c.fill} {...S} strokeWidth={2.4} />
+      <line x1={44} y1={49} x2={41} y2={40} stroke={INK} strokeWidth={2.2} strokeLinecap="round" />
+      <line x1={56} y1={49} x2={59} y2={40} stroke={INK} strokeWidth={2.2} strokeLinecap="round" />
+      <circle cx={41} cy={38} r={2.8} fill={TECH} stroke={INK} strokeWidth={1.6} />
+      <circle cx={59} cy={38} r={2.8} fill={TECH} stroke={INK} strokeWidth={1.6} />
+      <MechEye x={eyePos[0]} y={eyePos[1]} eye={c.eye} s={0.8} />
+      <path d={`M 46 66 q 4 2.6 8 0`} fill="none" stroke={INK} strokeWidth={1.8} strokeLinecap="round" />
+      <Core x={53} y={58} r={3.2} />
+    </g>
+  );
+  return { jsx, a: { top: [50, 34], back: [62, 48], core: [53, 58], eye: eyePos, feet: [[20, 82], [80, 82]] } };
+}
+
+function rigOcto(c: Ctx): RigOut {
+  const eyePos: [number, number] = [46, 48];
+  const jsx = (
+    <g>
+      <HoverRing cx={50} cy={86} rx={22} />
+      <g fill={c.fill} {...S} strokeWidth={2}>
+        {[-16, -8, 0, 8, 16].map((dx, i) => (
+          <path key={i} d={`M ${47 + dx} 62 Q ${44 + dx + (i % 2 ? 8 : -8)} 74 ${50 + dx} 80 Q ${54 + dx} 74 ${53 + dx} 62 Z`} />
+        ))}
+      </g>
+      <path d={`M 28 56 Q 28 30 50 30 Q 72 30 72 56 Q 72 66 50 66 Q 28 66 28 56 Z`} fill={c.fill} {...S} strokeWidth={2.4} />
+      <path d={`M 34 40 Q 42 34 52 35`} fill="none" stroke={lighten(c.base, 0.3)} strokeWidth={2.2} strokeLinecap="round" opacity={0.8} />
+      <MechEye x={eyePos[0]} y={eyePos[1]} eye={c.eye} s={1.15} />
+      <Core x={58} y={54} r={3} />
+    </g>
+  );
+  return { jsx, a: { top: [50, 28], back: [66, 38], core: [58, 54], eye: eyePos, feet: [] } };
+}
+
+function rigJelly(c: Ctx): RigOut {
+  const eyePos: [number, number] = [46, 48];
+  const jsx = (
+    <g>
+      <HoverRing cx={50} cy={86} rx={20} />
+      <g fill="none" stroke={lighten(c.base, 0.15)} strokeWidth={3} strokeLinecap="round">
+        {[-12, -4, 4, 12].map((dx, i) => (
+          <path key={i} d={`M ${50 + dx} 60 Q ${50 + dx + (i % 2 ? 5 : -5)} 70 ${50 + dx} 80`} />
+        ))}
+      </g>
+      <path d={`M 27 54 A 23 23 0 0 1 73 54 L 73 57 Q 67 61 61 57 Q 56 61 50 57 Q 44 61 39 57 Q 33 61 27 57 Z`} fill={c.fill} opacity={0.92} {...S} strokeWidth={2.4} />
+      <circle cx={54} cy={44} r={5} fill={lighten(c.base, 0.35)} opacity={0.7} />
+      <MechEye x={eyePos[0]} y={eyePos[1]} eye={c.eye} s={1} />
+      <Core x={50} y={38} r={3} />
+    </g>
+  );
+  return { jsx, a: { top: [50, 30], back: [64, 40], core: [50, 38], eye: eyePos, feet: [] } };
+}
+
+/* ---------- 레벨 장비 (앵커 기반 로봇 업그레이드) ---------- */
+
+function levelGear(level: number, a: Anchors): ReactNode {
+  const items: ReactNode[] = [];
+  const [tx, ty] = a.top;
+  const [bx2, by2] = a.back;
+  const [cx2, cy2] = a.core;
+  const [ex, ey] = a.eye;
+  if (level >= 3)
+    items.push(<rect key="chip" x={tx + 6} y={ty + 5} width={4.6} height={7} rx={2} fill={METAL} stroke={INK} strokeWidth={1.5} />);
   if (level >= 4)
     items.push(
-      <g key="antenna">
-        <line x1={50} y1={g.top - 2} x2={50} y2={g.top - 13} stroke={INK} strokeWidth={2.6} strokeLinecap="round" />
-        <circle cx={50} cy={g.top - 15} r={4} fill={TECH} stroke={INK} strokeWidth={1.8} />
-        <circle cx={51.4} cy={g.top - 16.4} r={1.2} fill="#fff" opacity={0.9} />
+      <g key="ant">
+        <line x1={tx} y1={ty + 2} x2={tx} y2={ty - 8} stroke={INK} strokeWidth={2.4} strokeLinecap="round" />
+        <circle cx={tx} cy={ty - 10} r={3.4} fill={TECH} stroke={INK} strokeWidth={1.6} />
       </g>,
     );
-  if (level >= 5) items.push(<circle key="corering" cx={50} cy={g.plateCy} r={6.8} fill="none" stroke={GOLD} strokeWidth={1.8} />);
+  if (level >= 5) items.push(<circle key="ring" cx={cx2} cy={cy2} r={7.4} fill="none" stroke={GOLD} strokeWidth={1.8} />);
   if (level >= 6)
     items.push(
-      <g key="boosters">
-        <rect x={29} y={85} width={18} height={7.5} rx={2.5} fill={METAL_DARK} stroke={INK} strokeWidth={1.8} />
-        <rect x={53} y={85} width={18} height={7.5} rx={2.5} fill={METAL_DARK} stroke={INK} strokeWidth={1.8} />
-        <path d={`M 35 93 l 3 4.5 l 3 -4.5 Z M 59 93 l 3 4.5 l 3 -4.5 Z`} fill={TECH} stroke="none" opacity={0.9} />
-      </g>,
+      a.feet.length > 0 ? (
+        <g key="boost">
+          {a.feet.map(([fx, fy], i) => (
+            <g key={i}>
+              <rect x={fx - 6} y={fy + 3.4} width={12} height={4.6} rx={2} fill={METAL_DARK} stroke={INK} strokeWidth={1.6} />
+              <path d={`M ${fx - 2.6} ${fy + 8.4} l 2.6 4 l 2.6 -4 Z`} fill={TECH} opacity={0.9} />
+            </g>
+          ))}
+        </g>
+      ) : (
+        <g key="boost" className="tm-aura">
+          <ellipse cx={50} cy={86} rx={26} ry={4} fill={TECH} opacity={0.35} />
+        </g>
+      ),
     );
   if (level >= 7)
     items.push(
-      <g key="pads">
-        <rect x={50 - g.rx - 6} y={g.top + 13} width={13} height={8} rx={3.5} fill={METAL} stroke={INK} strokeWidth={1.8} transform={`rotate(-14 ${50 - g.rx} ${g.top + 17})`} />
-        <rect x={50 + g.rx - 7} y={g.top + 13} width={13} height={8} rx={3.5} fill={METAL} stroke={INK} strokeWidth={1.8} transform={`rotate(14 ${50 + g.rx} ${g.top + 17})`} />
-      </g>,
+      <rect key="pad" x={bx2 - 12} y={by2 - 5} width={16} height={7} rx={3} fill={METAL} stroke={INK} strokeWidth={1.8} transform={`rotate(-10 ${bx2 - 4} ${by2})`} />,
     );
   if (level >= 9)
     items.push(
-      <g key="bands">
-        <rect x={50 - g.rx - 4} y={g.cy + 2} width={8} height={12} rx={4} fill={METAL_DARK} stroke={INK} strokeWidth={1.6} />
-        <rect x={50 + g.rx - 4} y={g.cy + 2} width={8} height={12} rx={4} fill={METAL_DARK} stroke={INK} strokeWidth={1.6} />
+      <g key="pack">
+        <rect x={bx2 + 2} y={by2 - 8} width={9} height={13} rx={2.5} fill={METAL_DARK} stroke={INK} strokeWidth={1.8} />
+        <line x1={bx2 + 4.5} y1={by2 - 6} x2={bx2 + 4.5} y2={by2 + 2} stroke={INK} strokeWidth={1.2} opacity={0.6} />
       </g>,
     );
-  if (level >= 10)
-    items.push(
-      <g key="overcharge" className="tm-twinkle">
-        <circle cx={50} cy={g.plateCy} r={5} fill={TECH} opacity={0.55} />
-      </g>,
-    );
+  if (level >= 10) items.push(<circle key="over" className="tm-twinkle" cx={cx2} cy={cy2} r={5} fill={TECH} opacity={0.5} />);
   if (level >= 11)
     items.push(
-      <rect
-        key="visor"
-        x={50 - g.eyeDx - g.eyeR - 5}
-        y={g.eyeY - g.eyeR - 7}
-        width={(g.eyeDx + g.eyeR + 5) * 2}
-        height={5}
-        rx={2.5}
-        fill={TECH}
-        opacity={0.45}
-        stroke={INK}
-        strokeWidth={1.4}
-      />,
+      <rect key="visor" x={ex - 9} y={ey - 7.5} width={18} height={4.4} rx={2.2} fill={TECH} opacity={0.45} stroke={INK} strokeWidth={1.3} transform={`rotate(-6 ${ex} ${ey})`} />,
     );
   if (level >= 12)
     items.push(
       <g key="jets">
-        <path d={`M ${50 - g.rx + 2} ${g.cy - 14} L ${50 - g.rx - 10} ${g.cy - 22} L ${50 - g.rx - 2} ${g.cy - 8} Z`} fill={METAL} stroke={INK} strokeWidth={1.8} strokeLinejoin="round" />
-        <path d={`M ${50 + g.rx - 2} ${g.cy - 14} L ${50 + g.rx + 10} ${g.cy - 22} L ${50 + g.rx + 2} ${g.cy - 8} Z`} fill={METAL} stroke={INK} strokeWidth={1.8} strokeLinejoin="round" />
+        <path d={`M ${bx2 + 4} ${by2 - 4} L ${bx2 + 18} ${by2 - 14} L ${bx2 + 10} ${by2} Z`} fill={METAL} stroke={INK} strokeWidth={1.8} strokeLinejoin="round" />
+        <path d={`M ${bx2 + 2} ${by2} L ${bx2 + 16} ${by2 - 4} L ${bx2 + 8} ${by2 + 5} Z`} fill={METAL_DARK} stroke={INK} strokeWidth={1.6} strokeLinejoin="round" />
       </g>,
     );
-  if (level >= 13)
-    items.push(
-      <g key="emblem">
-        <path d={star4(50 + g.plateW / 2 + 6, g.plateCy - 4, 5.5)} fill={GOLD} stroke={INK} strokeWidth={1.4} />
-      </g>,
-    );
+  if (level >= 13) items.push(<path key="emblem" d={star4(cx2 + 11, cy2 - 5, 5)} fill={GOLD} stroke={INK} strokeWidth={1.3} />);
   if (level >= 14)
     items.push(
       <g key="particles" className="tm-twinkle">
         {[
-          [16, 20],
-          [84, 20],
-          [12, 78],
-          [88, 78],
+          [14, 22],
+          [88, 24],
+          [10, 74],
+          [90, 72],
         ].map(([x, y], i) => (
-          <path key={i} d={star4(x, y, 3.2)} fill={TECH} />
+          <path key={i} d={star4(x, y, 3)} fill={TECH} />
         ))}
       </g>,
     );
   if (level >= 20)
     items.push(
       <g key="crown">
-        <path d={`M ${50 - 13} ${g.top - 8} L ${50 - 13} ${g.top - 18} L ${50 - 6} ${g.top - 12} L 50 ${g.top - 20} L ${50 + 6} ${g.top - 12} L ${50 + 13} ${g.top - 18} L ${50 + 13} ${g.top - 8} Z`} fill={GOLD} {...S} strokeWidth={2} />
-        <circle cx={50} cy={g.top - 11.5} r={2.2} fill="#c0392b" />
-        <circle cx={50 - 8.5} cy={g.top - 11.8} r={1.4} fill="#3e6dc0" />
-        <circle cx={50 + 8.5} cy={g.top - 11.8} r={1.4} fill="#3e6dc0" />
+        <path d={`M ${tx - 9} ${ty - 8} L ${tx - 9} ${ty - 16} L ${tx - 4} ${ty - 11} L ${tx} ${ty - 18} L ${tx + 4} ${ty - 11} L ${tx + 9} ${ty - 16} L ${tx + 9} ${ty - 8} Z`} fill={GOLD} {...S} strokeWidth={1.8} />
+        <circle cx={tx} cy={ty - 11} r={1.8} fill="#c0392b" />
       </g>,
     );
   return <>{items}</>;
 }
 
 const SPARKLE_SPOTS: [number, number, number][] = [
-  [14, 28, 5],
-  [88, 50, 4.2],
-  [82, 14, 3.8],
-  [10, 64, 3.8],
-  [50, 97, 3.4],
-  [92, 84, 3.4],
+  [12, 34, 4.6],
+  [90, 44, 4],
+  [80, 12, 3.6],
+  [16, 60, 3.4],
+  [50, 12, 3.2],
+  [92, 78, 3.2],
 ];
 
-/* ---------- 메인 렌더러 ---------- */
+const RIGS: Record<string, (c: Ctx) => RigOut> = {
+  quad: rigQuad,
+  sit: rigSit,
+  bird: rigBird,
+  fish: rigFish,
+  trex: rigTrex,
+  snake: rigSnake,
+  turtle: rigTurtle,
+  bat: rigBat,
+  crab: rigCrab,
+  octo: rigOcto,
+  jelly: rigJelly,
+};
+
+/* ---------- 메인 ---------- */
 
 export function PetVector({
   species,
   color,
   level,
   eye,
-  mouth,
+  mouth: _mouth,
   levelProgressPct,
   size,
   label,
@@ -1146,7 +1024,6 @@ export function PetVector({
   const info = getSpeciesInfo(species);
   const base = getColorInfo(color).base;
 
-  /* Lv.1 — 인큐베이터 알 */
   if (level <= 1) {
     return (
       <svg viewBox="0 0 100 100" width={size} height={size} role="img" aria-label={label} style={{ overflow: "visible" }}>
@@ -1157,12 +1034,12 @@ export function PetVector({
             <stop offset="100%" stopColor="#d6c9a8" />
           </radialGradient>
         </defs>
-        <ellipse cx={50} cy={92} rx={26} ry={4} fill="#20201e" opacity={0.1} />
-        <path d="M50 16 C68 16 78 38 78 57 C78 77 65 88 50 88 C35 88 22 77 22 57 C22 38 32 16 50 16 Z" fill={`url(#${uid}e)`} stroke={INK} strokeWidth={2.4} />
-        <path d="M23.5 60 Q 50 66 76.5 60" fill="none" stroke={METAL_DARK} strokeWidth={4} opacity={0.75} />
-        <circle cx={50} cy={62.6} r={2.6} fill={TECH} stroke={INK} strokeWidth={1.4} className="tm-twinkle" />
-        <ellipse cx={42} cy={40} rx={4.4} ry={3.2} fill={base} opacity={0.85} />
-        <ellipse cx={59} cy={48} rx={3.6} ry={2.7} fill={base} opacity={0.85} />
+        <ellipse cx={50} cy={90} rx={25} ry={3.6} fill="#20201e" opacity={0.1} />
+        <path d="M50 18 C67 18 77 39 77 57 C77 76 64 87 50 87 C36 87 23 76 23 57 C23 39 33 18 50 18 Z" fill={`url(#${uid}e)`} stroke={INK} strokeWidth={2.4} />
+        <path d="M24.5 60 Q 50 66 75.5 60" fill="none" stroke={METAL_DARK} strokeWidth={4} opacity={0.75} />
+        <circle cx={50} cy={62.4} r={2.5} fill={TECH} stroke={INK} strokeWidth={1.4} className="tm-twinkle" />
+        <ellipse cx={42} cy={40} rx={4.2} ry={3} fill={base} opacity={0.85} />
+        <ellipse cx={59} cy={48} rx={3.4} ry={2.6} fill={base} opacity={0.85} />
         {levelProgressPct >= 60 && (
           <path d="M 40 28 L 46 34 L 41 40 L 48 45" fill="none" stroke="#8f8060" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
         )}
@@ -1170,58 +1047,46 @@ export function PetVector({
     );
   }
 
-  const g: Geom = { ...GEOMS[info.body], ...(GEOM_TWEAKS[species] ?? {}) };
-  const bodyFill = `url(#${uid}b)`;
-  const ctx: Ctx = { g, base, dark: darken(base, 0.3), light: lighten(base, 0.45), fill: bodyFill };
-
-  const behind: ReactNode[] = [];
-  const front: ReactNode[] = [];
-  let suppressMouth = false;
-  info.parts.forEach(([family, kind], index) => {
-    if (MOUTH_SUPPRESS.has(`${family}:${kind}`)) suppressMouth = true;
-    const part = renderPart(family, kind, ctx);
-    if (part.behind) behind.push(<g key={`b${index}`}>{part.behind}</g>);
-    if (part.front) front.push(<g key={`f${index}`}>{part.front}</g>);
-  });
-
+  const ctx: Ctx = {
+    base,
+    dark: darken(base, 0.28),
+    light: lighten(base, 0.45),
+    fill: `url(#${uid}b)`,
+    p: info.p,
+    eye,
+  };
+  const rig = (RIGS[info.rig] ?? rigSit)(ctx);
   const sparkles = Math.max(0, Math.min(SPARKLE_SPOTS.length, level - 14));
 
   return (
     <svg viewBox="0 0 100 100" width={size} height={size} role="img" aria-label={label} style={{ overflow: "visible" }}>
       <defs>
         <radialGradient id={`${uid}b`} cx="38%" cy="28%" r="85%">
-          <stop offset="0%" stopColor={lighten(base, 0.26)} />
+          <stop offset="0%" stopColor={lighten(base, 0.24)} />
           <stop offset="55%" stopColor={base} />
           <stop offset="100%" stopColor={darken(base, 0.2)} />
         </radialGradient>
       </defs>
-      <ellipse cx={50} cy={92} rx={g.rx + 3} ry={4.2} fill="#20201e" opacity={0.1} />
+      <ellipse cx={50} cy={90} rx={34} ry={4} fill="#20201e" opacity={0.1} />
       {level >= 15 && (
         <g className="tm-aura">
-          <circle cx={50} cy={54} r={46} fill={GOLD} opacity={0.09} />
-          <circle cx={50} cy={54} r={37} fill={GOLD} opacity={0.07} />
+          <circle cx={50} cy={52} r={46} fill={GOLD} opacity={0.08} />
+          <circle cx={50} cy={52} r={37} fill={GOLD} opacity={0.06} />
         </g>
       )}
       {level >= 18 && (
-        <g>
-          <path d={`M 28 38 Q 50 30 72 38 L 84 88 Q 50 97 16 88 Z`} fill="#8e3438" {...S} />
-          <path d={`M 33 40 Q 50 34 67 40 L 75 85 Q 50 92 25 85 Z`} fill="#a03e42" stroke="none" />
-          <path d={`M 16 88 Q 50 97 84 88`} fill="none" stroke={GOLD} strokeWidth={3.2} strokeLinecap="round" />
-        </g>
+        <path
+          d={`M ${rig.a.back[0] - 4} ${rig.a.back[1]} Q ${rig.a.back[0] + 26} ${rig.a.back[1] - 6} ${rig.a.back[0] + 40} ${rig.a.back[1] + 26} Q ${rig.a.back[0] + 22} ${rig.a.back[1] + 22} ${rig.a.back[0] + 6} ${rig.a.back[1] + 14} Z`}
+          fill="#8e3438"
+          {...S}
+        />
       )}
-      {behind}
-      {renderBody(info.body, g, bodyFill, base)}
-      <Feet g={g} />
-      <RobotLayer g={g} base={base} />
-      <Eye cx={50 - g.eyeDx} cy={g.eyeY} eye={eye} r={g.eyeR} />
-      <Eye cx={50 + g.eyeDx} cy={g.eyeY} eye={eye} r={g.eyeR} />
-      {!suppressMouth && <Mouth cx={50} cy={g.mouthY} mood={mouth} />}
-      {front}
-      {levelGear(level, g)}
+      {rig.jsx}
+      {levelGear(level, rig.a)}
       {sparkles > 0 && (
         <g className="tm-twinkle">
-          {SPARKLE_SPOTS.slice(0, sparkles).map(([cx, cy, r], index) => (
-            <path key={index} d={star4(cx, cy, r)} fill={GOLD} stroke={INK} strokeWidth={0.8} />
+          {SPARKLE_SPOTS.slice(0, sparkles).map(([cx3, cy3, r], index) => (
+            <path key={index} d={star4(cx3, cy3, r)} fill={GOLD} stroke={INK} strokeWidth={0.8} />
           ))}
         </g>
       )}

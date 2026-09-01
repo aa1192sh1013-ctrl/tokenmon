@@ -2,8 +2,9 @@ import type { TokenmonColor, TokenmonSpecies } from "@/lib/tokenmon";
 
 /**
  * 종족 레지스트리 — 서로 다른 동물 50종 + 공룡류 5종 + 환수종 5종.
- * 형태는 파츠 조합 레시피로 정의하고, 색(12종)은 프로젝트마다 랜덤 배정된다.
- * 실제 드로잉은 tokenmon-vector.tsx가 담당한다.
+ * 각 종은 측면 실루엣 리그(rig)와 파라미터(p)로 정의된다 — 사족보행 메카,
+ * 새, 어류, 소형 착석형 등 실제 동물 자세가 그대로 보이는 방식.
+ * 색(12종)은 종과 별개로 프로젝트마다 랜덤 배정된다.
  */
 
 export const GOLD = "#d4a842";
@@ -30,89 +31,115 @@ export const COLOR_DEFS: Record<TokenmonColor, ColorDef> = {
   bronze: { label: "동", base: "#a67a4a" },
 };
 
-export type BodyKind = "round" | "wide" | "fish" | "neck" | "snake" | "jelly";
-/** [파츠 계열, 변형] — 벡터 렌더러의 파츠 스위치와 1:1. */
-export type Part = readonly [string, string];
+export type RigKind =
+  | "quad" // 사족보행 (늑대·호랑이·말 등)
+  | "sit" // 앉은 소형 (토끼·햄스터·곰 등)
+  | "bird" // 조류 (서 있는 측면)
+  | "fish" // 어류 (호버링)
+  | "trex" // 이족 공룡
+  | "snake"
+  | "turtle"
+  | "bat"
+  | "crab"
+  | "octo"
+  | "jelly";
+
+export interface SpeciesParams {
+  /** 주둥이: wolf | cat | dog | horse | block | pig | croc | trunk | none */
+  muzzle?: string;
+  /** 귀: point | bigpoint | round | floppy | long | side | huge | tuft | fluff | none */
+  ear?: string;
+  /** 꼬리: bushy | tipped | up | flow | stub | thin | curl | spade | spike | puff | ring | flat | none */
+  tail?: string;
+  /** 부리(조류): flat | tiny | tri | hook | sharp | bent */
+  beak?: string;
+  /** 추가 요소들 */
+  extras?: readonly string[];
+  /** 목이 긴 변형(quad: 브라키오, bird: 플라밍고·백조) */
+  longNeck?: boolean;
+  /** 낮고 긴 몸 (악어) */
+  low?: boolean;
+}
 
 export interface SpeciesDef {
   label: string;
   cry: string;
-  body: BodyKind;
-  parts: readonly Part[];
+  rig: RigKind;
+  p: SpeciesParams;
   rare?: boolean;
   rareKind?: "dino" | "mythic";
 }
 
 export const SPECIES_DEFS: Record<string, SpeciesDef> = {
-  /* ---- 포유류 ---- */
-  dog: { label: "강아지봇", cry: "멍!", body: "round", parts: [["ear", "floppy"], ["snout", "dog"]] },
-  cat: { label: "고양이봇", cry: "냐옹", body: "round", parts: [["ear", "pointy"], ["face", "whiskers"], ["snout", "tri"]] },
-  bunny: { label: "토끼봇", cry: "촐랑", body: "round", parts: [["ear", "long"], ["face", "teeth"]] },
-  bear: { label: "곰봇", cry: "크릉", body: "round", parts: [["ear", "round"], ["snout", "muzzle"]] },
-  panda: { label: "판다봇", cry: "우물", body: "round", parts: [["ear", "round"], ["face", "patch"], ["snout", "muzzle"]] },
-  koala: { label: "코알라봇", cry: "쿨…", body: "round", parts: [["ear", "big"], ["snout", "nose"]] },
-  hamster: { label: "햄스터봇", cry: "오물", body: "round", parts: [["ear", "round"], ["face", "pouch"], ["face", "teeth"]] },
-  mouse: { label: "생쥐봇", cry: "찍!", body: "round", parts: [["ear", "big"], ["face", "whiskers"], ["snout", "tri"]] },
-  squirrel: { label: "다람쥐봇", cry: "탁탁", body: "round", parts: [["ear", "tuft"], ["tail", "bushy"], ["face", "teeth"]] },
-  hedgehog: { label: "고슴도치봇", cry: "콕콕", body: "round", parts: [["back", "spikesCrown"], ["snout", "nose"]] },
-  deer: { label: "사슴봇", cry: "총총", body: "round", parts: [["horns", "antler"], ["ear", "floppy"], ["snout", "nose"]] },
-  horse: { label: "말봇", cry: "히힝", body: "round", parts: [["ear", "pointy"], ["mane", "top"]] },
-  sheep: { label: "양봇", cry: "메에", body: "round", parts: [["mane", "wool"], ["ear", "floppy"]] },
-  goat: { label: "염소봇", cry: "매애", body: "round", parts: [["horns", "back"], ["mane", "beard"], ["ear", "floppy"]] },
-  cow: { label: "젖소봇", cry: "음머", body: "round", parts: [["horns", "small"], ["face", "spots"], ["snout", "cow"]] },
-  pig: { label: "돼지봇", cry: "꿀꿀", body: "round", parts: [["ear", "pointy"], ["snout", "pig"]] },
-  elephant: { label: "코끼리봇", cry: "뿌우", body: "round", parts: [["ear", "huge"], ["snout", "trunk"]] },
-  monkey: { label: "원숭이봇", cry: "우끼", body: "round", parts: [["ear", "side"], ["face", "monkey"]] },
-  otter: { label: "수달봇", cry: "뽀글", body: "round", parts: [["ear", "round"], ["snout", "muzzle"], ["face", "whiskers"]] },
-  raccoon: { label: "너구리봇", cry: "부스럭", body: "round", parts: [["ear", "pointy"], ["face", "mask"], ["snout", "nose"]] },
-  /* ---- 육식 ---- */
-  wolf: { label: "늑대봇", cry: "아우~", body: "round", parts: [["ear", "tall"], ["snout", "dog"], ["face", "fangs"], ["face", "brow"]] },
-  fox: { label: "여우봇", cry: "콘!", body: "round", parts: [["ear", "tall"], ["snout", "tri"], ["tail", "fox"]] },
-  tiger: { label: "호랑이봇", cry: "어흥", body: "round", parts: [["ear", "round"], ["face", "stripes"], ["face", "fangs"], ["face", "brow"]] },
-  lion: { label: "사자봇", cry: "크앙", body: "round", parts: [["mane", "ruff"], ["ear", "round"], ["snout", "tri"], ["face", "brow"]] },
-  cheetah: { label: "치타봇", cry: "슝!", body: "round", parts: [["ear", "round"], ["face", "tear"], ["face", "brow"]] },
-  croc: { label: "악어봇", cry: "덥석", body: "round", parts: [["snout", "croc"], ["back", "ridges"], ["face", "brow"]] },
-  snake: { label: "뱀봇", cry: "스륵", body: "snake", parts: [["face", "tongue"]] },
-  bat: { label: "박쥐봇", cry: "끼익", body: "round", parts: [["ear", "tall"], ["wings", "bat"], ["face", "fangs"]] },
-  hawk: { label: "매봇", cry: "휘익", body: "round", parts: [["beak", "hook"], ["face", "brow"], ["wings", "side"]] },
-  crow: { label: "까마귀봇", cry: "까악", body: "round", parts: [["beak", "sharp"], ["crest", "tuft"]] },
-  /* ---- 조류·양서·파충 ---- */
-  duck: { label: "오리봇", cry: "꽥!", body: "round", parts: [["beak", "flat"], ["crest", "curl"], ["wings", "small"]] },
-  chick: { label: "병아리봇", cry: "삐약", body: "round", parts: [["crest", "three"], ["beak", "tiny"], ["wings", "small"]] },
-  penguin: { label: "펭귄봇", cry: "펭!", body: "round", parts: [["face", "belly"], ["beak", "tri"], ["wings", "flippers"]] },
-  owl: { label: "부엉이봇", cry: "부엉", body: "round", parts: [["face", "discs"], ["ear", "tufts"], ["beak", "tri"]] },
-  parrot: { label: "앵무봇", cry: "안녕!", body: "round", parts: [["beak", "hookBig"], ["crest", "tall"]] },
-  peacock: { label: "공작봇", cry: "화락", body: "round", parts: [["back", "peacock"], ["crest", "pins"], ["beak", "tiny"]] },
-  flamingo: { label: "플라밍고봇", cry: "훌쩍", body: "neck", parts: [["beak", "bent"]] },
-  swan: { label: "백조봇", cry: "스르륵", body: "neck", parts: [["beak", "flat"]] },
-  frog: { label: "개구리봇", cry: "개굴", body: "round", parts: [["face", "mounts"], ["face", "wide"]] },
-  turtle: { label: "거북봇", cry: "엉금", body: "round", parts: [["face", "shell"], ["back", "shellRim"]] },
+  /* ---- 사족보행 포유류 ---- */
+  dog: { label: "강아지봇", cry: "멍!", rig: "quad", p: { muzzle: "dog", ear: "floppy", tail: "up" } },
+  cat: { label: "고양이봇", cry: "냐옹", rig: "quad", p: { muzzle: "cat", ear: "point", tail: "up", extras: ["whiskers"] } },
+  wolf: { label: "늑대봇", cry: "아우~", rig: "quad", p: { muzzle: "wolf", ear: "point", tail: "bushy", extras: ["fang"] } },
+  fox: { label: "여우봇", cry: "콘!", rig: "quad", p: { muzzle: "wolf", ear: "bigpoint", tail: "tipped" } },
+  tiger: { label: "호랑이봇", cry: "어흥", rig: "quad", p: { muzzle: "cat", ear: "round", tail: "up", extras: ["stripes", "fang"] } },
+  lion: { label: "사자봇", cry: "크앙", rig: "quad", p: { muzzle: "cat", ear: "round", tail: "tuftTail", extras: ["mane", "fang"] } },
+  cheetah: { label: "치타봇", cry: "슝!", rig: "quad", p: { muzzle: "cat", ear: "round", tail: "thin", extras: ["spots", "tear"] } },
+  deer: { label: "사슴봇", cry: "총총", rig: "quad", p: { muzzle: "horse", ear: "side", tail: "stub", extras: ["antler"] } },
+  horse: { label: "말봇", cry: "히힝", rig: "quad", p: { muzzle: "horse", ear: "point", tail: "flow", extras: ["mane"] } },
+  sheep: { label: "양봇", cry: "메에", rig: "quad", p: { muzzle: "block", ear: "side", tail: "stub", extras: ["wool"] } },
+  goat: { label: "염소봇", cry: "매애", rig: "quad", p: { muzzle: "block", ear: "side", tail: "stub", extras: ["hornsBack", "beard"] } },
+  cow: { label: "젖소봇", cry: "음머", rig: "quad", p: { muzzle: "block", ear: "side", tail: "tuftTail", extras: ["hornsSmall", "spots"] } },
+  pig: { label: "돼지봇", cry: "꿀꿀", rig: "quad", p: { muzzle: "pig", ear: "point", tail: "curl" } },
+  elephant: { label: "코끼리봇", cry: "뿌우", rig: "quad", p: { muzzle: "trunk", ear: "huge", tail: "thin" } },
+  croc: { label: "악어봇", cry: "덥석", rig: "quad", p: { muzzle: "croc", ear: "none", tail: "spike", low: true, extras: ["ridges"] } },
+  /* ---- 앉은 소형 ---- */
+  bunny: { label: "토끼봇", cry: "촐랑", rig: "sit", p: { ear: "long", tail: "puff", extras: ["teeth"] } },
+  hamster: { label: "햄스터봇", cry: "오물", rig: "sit", p: { ear: "round", tail: "stub", extras: ["cheek", "teeth"] } },
+  mouse: { label: "생쥐봇", cry: "찍!", rig: "sit", p: { ear: "big", tail: "thin", extras: ["whiskers"] } },
+  squirrel: { label: "다람쥐봇", cry: "탁탁", rig: "sit", p: { ear: "tuft", tail: "bigbush", extras: ["teeth"] } },
+  hedgehog: { label: "고슴도치봇", cry: "콕콕", rig: "sit", p: { ear: "none", tail: "none", extras: ["spikes"] } },
+  koala: { label: "코알라봇", cry: "쿨…", rig: "sit", p: { ear: "fluff", tail: "none", extras: ["bignose"] } },
+  panda: { label: "판다봇", cry: "우물", rig: "sit", p: { ear: "round", tail: "stub", extras: ["patch"] } },
+  bear: { label: "곰봇", cry: "크릉", rig: "sit", p: { ear: "round", tail: "stub", extras: ["chunky"] } },
+  monkey: { label: "원숭이봇", cry: "우끼", rig: "sit", p: { ear: "side", tail: "curlLong", extras: ["facePatch"] } },
+  otter: { label: "수달봇", cry: "뽀글", rig: "sit", p: { ear: "round", tail: "flat", extras: ["whiskers"] } },
+  raccoon: { label: "너구리봇", cry: "부스럭", rig: "sit", p: { ear: "point", tail: "ring", extras: ["mask"] } },
+  frog: { label: "개구리봇", cry: "개굴", rig: "sit", p: { ear: "none", tail: "none", extras: ["frogEyes", "crouch"] } },
+  chameleon: { label: "카멜레온봇", cry: "쓱…", rig: "sit", p: { ear: "none", tail: "spiral", extras: ["crest", "coneEye"] } },
+  /* ---- 조류 ---- */
+  duck: { label: "오리봇", cry: "꽥!", rig: "bird", p: { beak: "flat", extras: ["curl"] } },
+  chick: { label: "병아리봇", cry: "삐약", rig: "bird", p: { beak: "tiny", extras: ["crest3"] } },
+  penguin: { label: "펭귄봇", cry: "펭!", rig: "bird", p: { beak: "tri", extras: ["upright", "belly"] } },
+  owl: { label: "부엉이봇", cry: "부엉", rig: "bird", p: { beak: "tri", extras: ["upright", "discs", "tufts"] } },
+  parrot: { label: "앵무봇", cry: "안녕!", rig: "bird", p: { beak: "hook", extras: ["crestTall"] } },
+  crow: { label: "까마귀봇", cry: "까악", rig: "bird", p: { beak: "sharp", extras: ["tuftHead"] } },
+  hawk: { label: "매봇", cry: "휘익", rig: "bird", p: { beak: "hook", extras: ["brow"] } },
+  peacock: { label: "공작봇", cry: "화락", rig: "bird", p: { beak: "tiny", extras: ["fanTail", "pins"] } },
+  flamingo: { label: "플라밍고봇", cry: "훌쩍", rig: "bird", p: { beak: "bent", longNeck: true, extras: ["oneLeg"] } },
+  swan: { label: "백조봇", cry: "스르륵", rig: "bird", p: { beak: "flat", longNeck: true } },
   /* ---- 어류·수중 ---- */
-  shark: { label: "상어봇", cry: "철컥", body: "fish", parts: [["back", "dorsal"], ["face", "grin"], ["face", "gills"]] },
-  orca: { label: "범고래봇", cry: "쏴아", body: "fish", parts: [["face", "orca"], ["back", "dorsal"], ["tail", "fluke"]] },
-  goldfish: { label: "금붕어봇", cry: "뻐끔", body: "fish", parts: [["tail", "fan"], ["wings", "flowfins"], ["face", "lips"]] },
-  puffer: { label: "복어봇", cry: "빵!", body: "fish", parts: [["back", "spikesAround"], ["face", "lips"]] },
-  octopus: { label: "문어봇", cry: "꾸물", body: "jelly", parts: [["tail", "tentacles"]] },
-  jellyfish: { label: "해파리봇", cry: "둥둥", body: "jelly", parts: [["tail", "strips"]] },
-  crab: { label: "게봇", cry: "집게!", body: "wide", parts: [["wings", "claws"], ["ear", "stalks"]] },
-  ray: { label: "가오리봇", cry: "팔랑", body: "wide", parts: [["wings", "flat"], ["tail", "thin"]] },
-  seahorse: { label: "해마봇", cry: "말랑", body: "neck", parts: [["beak", "tube"], ["crest", "ridge"]] },
-  chameleon: { label: "카멜레온봇", cry: "쓱…", body: "round", parts: [["face", "cones"], ["tail", "curl"], ["crest", "ridge"]] },
+  shark: { label: "상어봇", cry: "철컥", rig: "fish", p: { extras: ["dorsalBig", "teeth", "gills", "sharpNose"] } },
+  orca: { label: "범고래봇", cry: "쏴아", rig: "fish", p: { extras: ["dorsalBig", "orcaPatch", "belly"] } },
+  goldfish: { label: "금붕어봇", cry: "뻐끔", rig: "fish", p: { extras: ["flowTail", "lips"] } },
+  puffer: { label: "복어봇", cry: "빵!", rig: "fish", p: { extras: ["roundBody", "spikes", "lips"] } },
+  ray: { label: "가오리봇", cry: "팔랑", rig: "fish", p: { extras: ["wide", "whipTail"] } },
+  seahorse: { label: "해마봇", cry: "말랑", rig: "fish", p: { extras: ["upright", "tube", "finBack"] } },
+  turtle: { label: "거북봇", cry: "엉금", rig: "turtle", p: {} },
+  snake: { label: "뱀봇", cry: "스륵", rig: "snake", p: {} },
+  bat: { label: "박쥐봇", cry: "끼익", rig: "bat", p: {} },
+  crab: { label: "게봇", cry: "집게!", rig: "crab", p: {} },
+  octopus: { label: "문어봇", cry: "꾸물", rig: "octo", p: {} },
+  jellyfish: { label: "해파리봇", cry: "둥둥", rig: "jelly", p: {} },
   /* ---- 공룡류 (레어) ---- */
-  tyranno: { label: "티라노봇", cry: "쿠앙!", body: "round", rare: true, rareKind: "dino", parts: [["back", "spikes"], ["face", "grin"], ["wings", "tinyArms"], ["face", "brow"]] },
-  tricera: { label: "트리케라봇", cry: "푸릉!", body: "round", rare: true, rareKind: "dino", parts: [["back", "frill"], ["horns", "three"]] },
-  stego: { label: "스테고봇", cry: "우걱!", body: "round", rare: true, rareKind: "dino", parts: [["back", "plates"]] },
-  brachio: { label: "브라키오봇", cry: "뿌우!", body: "neck", rare: true, rareKind: "dino", parts: [] },
-  ptera: { label: "프테라봇", cry: "끼에엑!", body: "round", rare: true, rareKind: "dino", parts: [["wings", "ptera"], ["crest", "back"], ["beak", "sharp"]] },
+  tyranno: { label: "티라노봇", cry: "쿠앙!", rig: "trex", p: {}, rare: true, rareKind: "dino" },
+  tricera: { label: "트리케라봇", cry: "푸릉!", rig: "quad", p: { muzzle: "block", ear: "none", tail: "thick", extras: ["frill", "horn3"] }, rare: true, rareKind: "dino" },
+  stego: { label: "스테고봇", cry: "우걱!", rig: "quad", p: { muzzle: "block", ear: "none", tail: "spike", extras: ["plates"] }, rare: true, rareKind: "dino" },
+  brachio: { label: "브라키오봇", cry: "뿌우!", rig: "quad", p: { muzzle: "block", ear: "none", tail: "thick", longNeck: true }, rare: true, rareKind: "dino" },
+  ptera: { label: "프테라봇", cry: "끼에엑!", rig: "bat", p: { extras: ["pteraCrest", "beak"] }, rare: true, rareKind: "dino" },
   /* ---- 환수종 (레어) ---- */
-  unicorn: { label: "유니콘봇", cry: "뿅!", body: "round", rare: true, rareKind: "mythic", parts: [["horns", "spiral"], ["mane", "flow"]] },
-  dragonet: { label: "드래곤봇", cry: "크앙!", body: "round", rare: true, rareKind: "mythic", parts: [["horns", "curved"], ["wings", "batBig"], ["face", "scales"]] },
-  phoenix: { label: "불사조봇", cry: "화르륵!", body: "round", rare: true, rareKind: "mythic", parts: [["crest", "flame"], ["wings", "flame"], ["beak", "tiny"]] },
-  gumiho: { label: "구미호봇", cry: "콘…", body: "round", rare: true, rareKind: "mythic", parts: [["ear", "tall"], ["tail", "nine"], ["snout", "tri"]] },
-  pegasus: { label: "페가수스봇", cry: "히힝!", body: "round", rare: true, rareKind: "mythic", parts: [["wings", "feather"], ["mane", "flow"]] },
+  unicorn: { label: "유니콘봇", cry: "뿅!", rig: "quad", p: { muzzle: "horse", ear: "point", tail: "flow", extras: ["mane", "hornSpiral"] }, rare: true, rareKind: "mythic" },
+  dragonet: { label: "드래곤봇", cry: "크앙!", rig: "quad", p: { muzzle: "wolf", ear: "none", tail: "spade", extras: ["hornsBack", "wings", "fang"] }, rare: true, rareKind: "mythic" },
+  phoenix: { label: "불사조봇", cry: "화르륵!", rig: "bird", p: { beak: "tiny", extras: ["flameCrest", "flameTail"] }, rare: true, rareKind: "mythic" },
+  gumiho: { label: "구미호봇", cry: "콘…", rig: "quad", p: { muzzle: "wolf", ear: "bigpoint", tail: "none", extras: ["ninetails"] }, rare: true, rareKind: "mythic" },
+  pegasus: { label: "페가수스봇", cry: "히힝!", rig: "quad", p: { muzzle: "horse", ear: "point", tail: "flow", extras: ["mane", "wings"] }, rare: true, rareKind: "mythic" },
 };
 
-const FALLBACK: SpeciesDef = { label: "미확인봇", cry: "…?", body: "round", parts: [] };
+const FALLBACK: SpeciesDef = { label: "미확인봇", cry: "…?", rig: "sit", p: {} };
 
 export function getSpeciesInfo(species: TokenmonSpecies): SpeciesDef {
   return SPECIES_DEFS[species] ?? FALLBACK;
