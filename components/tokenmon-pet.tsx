@@ -1,22 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatTokenCount, formatUsd, type TokenmonMood, type TokenmonPet, type TokenmonStage } from "@/lib/tokenmon";
+import { formatTokenCount, formatUsd, type TokenmonMood, type TokenmonPet } from "@/lib/tokenmon";
 import { getSpeciesInfo } from "./tokenmon-species";
 import { PetVector, type EyeStyle } from "./tokenmon-vector";
 
-const STAGE_LABEL: Record<TokenmonStage, string> = { egg: "알", baby: "아기", pet: "어른", dragon: "황금킹" };
-
 const SAY_LINES: Record<TokenmonMood, string[]> = {
-  happy: ["냠냠! 오늘도 잘 먹었다!", "바이브 코딩 가보자고!"],
-  content: ["다음 끼니 기다리는 중…", "평화로운 코딩 라이프"],
-  sleeping: ["쿨쿨…"],
-  starving: ["배고파… 시들고 있어요"],
+  happy: ["시스템 전탄 가동!", "오늘도 순항 중."],
+  content: ["대기 모드… 다음 임무 기다림.", "에너지 안정적."],
+  sleeping: ["절전 모드…"],
+  starving: ["연료 부족… 시들고 있어요"],
 };
 
-/** 레벨마다 몸집도 조금씩 자란다. */
-function spriteSize(level: number, stage: TokenmonStage): number {
-  if (stage === "egg") return 54;
+/** 레벨마다 몸집이 조금씩 자란다. Lv.1은 알. */
+function spriteSize(level: number): number {
+  if (level <= 1) return 54;
   return Math.round(Math.min(88, 52 + level * 1.8));
 }
 
@@ -25,7 +23,8 @@ function spriteSize(level: number, stage: TokenmonStage): number {
 export function TokenmonPetCard({ pet }: { pet: TokenmonPet }) {
   const [blinking, setBlinking] = useState(false);
   const [sayIndex, setSayIndex] = useState(0);
-  const { projectName, species, stage, mood } = pet;
+  const { projectName, species, color, mood } = pet;
+  const isEgg = pet.level <= 1;
 
   useEffect(() => {
     if (mood === "sleeping") return;
@@ -56,15 +55,15 @@ export function TokenmonPetCard({ pet }: { pet: TokenmonPet }) {
     mood === "starving"
       ? `🥀 굶주림 XP -${pet.hungerPct}% — 돌아오면 회복돼요`
       : !pet.active
-        ? "쿨쿨…"
-        : stage === "egg"
-          ? "…(알 속에서 꼬물꼬물)"
+        ? "절전 모드…"
+        : isEgg
+          ? "…(부팅 준비 중)"
           : mood === "happy" || mood === "content"
             ? `${info.cry} ${line}`
             : line;
-  const label = `${info.label} — Lv.${pet.level} ${STAGE_LABEL[stage]}, ${projectName}`;
+  const label = `${info.label} — Lv.${pet.level}, ${projectName}`;
   const anim =
-    mood === "sleeping" || mood === "starving" ? "tm-breathe" : stage === "egg" ? "tm-wobble" : mood === "happy" ? "tm-hop" : "tm-bob";
+    mood === "sleeping" || mood === "starving" ? "tm-breathe" : isEgg ? "tm-wobble" : mood === "happy" ? "tm-hop" : "tm-bob";
 
   return (
     <div className={`tm-pet-card ${pet.active ? "" : "inactive"} ${mood === "starving" ? "starving" : ""}`}>
@@ -72,15 +71,13 @@ export function TokenmonPetCard({ pet }: { pet: TokenmonPet }) {
       {info.rare && <span className="tm-rare">✨RARE</span>}
       <div className={`tm-sprite-wrap ${anim}`}>
         <PetVector
-          shape={info.shape}
-          colors={info.colors}
-          hint={info.hint}
-          stage={stage}
+          species={species}
+          color={color}
           level={pet.level}
           eye={eye}
           mouth={mouth}
           levelProgressPct={pet.levelProgressPct}
-          size={spriteSize(pet.level, stage)}
+          size={spriteSize(pet.level)}
           label={label}
         />
         {mood === "sleeping" && (
@@ -95,10 +92,7 @@ export function TokenmonPetCard({ pet }: { pet: TokenmonPet }) {
         )}
       </div>
       <div className="tm-name">
-        {info.label}{" "}
-        <span className="tm-stage">
-          Lv.{pet.level} {STAGE_LABEL[stage]}
-        </span>
+        {info.label} <span className="tm-stage">Lv.{pet.level}</span>
         {pet.maxLevel && <span className="tm-max">👑MAX</span>}
       </div>
       <p className="tm-card-sub">

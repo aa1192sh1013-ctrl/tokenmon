@@ -65,26 +65,32 @@ export function parseTokenmonSnapshot(text: string): TokenmonSnapshot | null {
 /* ---------- 화면이 쓰는 파생 상태 ---------- */
 
 export type TokenmonMood = "happy" | "content" | "sleeping" | "starving";
-export type TokenmonStage = "egg" | "baby" | "pet" | "dragon";
-/** 종 ID — 흔한 종은 `${과}-${색상}`(예: "duck-lemon"), 레어는 고유 ID(예: "tyranno"). */
+/** 종 ID — 동물 50종 + 레어 10종, 각자 고유 형태. */
 export type TokenmonSpecies = string;
 
-/** 공통 과(科)와 색상 변종 키 — 조합이 흔한 종 50가지가 된다 (10과 × 색상 5종). */
-export const SPECIES_FAMILY_KEYS = ["duck", "cat", "penguin", "bunny", "frog", "bear", "chick", "pig", "owl", "turtle"] as const;
-export const SPECIES_PALETTE_KEYS = ["lemon", "strawberry", "mint", "sky", "grape", "cocoa", "lime", "peach", "snow", "charcoal"] as const;
-
-/** 과마다 색상 5종씩 회전 배정 — 흔한 종 50가지. */
-export const COMMON_SPECIES_IDS: readonly string[] = SPECIES_FAMILY_KEYS.flatMap((family, index) =>
-  [0, 2, 4, 6, 8].map((offset) => `${family}-${SPECIES_PALETTE_KEYS[(index + offset) % SPECIES_PALETTE_KEYS.length]}`),
-);
+/** 흔한 종 50가지 — 전부 서로 다른 동물 (초식·육식·조류·어류·수중 포함). */
+export const COMMON_SPECIES_IDS: readonly string[] = [
+  "dog", "cat", "bunny", "bear", "panda", "koala", "hamster", "mouse", "squirrel", "hedgehog",
+  "deer", "horse", "sheep", "goat", "cow", "pig", "elephant", "monkey", "otter", "raccoon",
+  "wolf", "fox", "tiger", "lion", "cheetah", "croc", "snake", "bat", "hawk", "crow",
+  "duck", "chick", "penguin", "owl", "parrot", "peacock", "flamingo", "swan", "frog", "turtle",
+  "shark", "orca", "goldfish", "puffer", "octopus", "jellyfish", "crab", "ray", "seahorse", "chameleon",
+];
 export const DINO_SPECIES_IDS: readonly string[] = ["tyranno", "tricera", "stego", "brachio", "ptera"];
 export const MYTHIC_SPECIES_IDS: readonly string[] = ["unicorn", "dragonet", "phoenix", "gumiho", "pegasus"];
 export const RARE_SPECIES: readonly string[] = [...DINO_SPECIES_IDS, ...MYTHIC_SPECIES_IDS];
 
-export function parseSpeciesId(id: string): { family: string; palette: string } | null {
-  const dash = id.lastIndexOf("-");
-  if (dash <= 0) return null;
-  return { family: id.slice(0, dash), palette: id.slice(dash + 1) };
+/** 색상 12종 — 빨·주·노·초·파·남·보·흰·검·금·은·동. 종과 별개로 랜덤 배정. */
+export const SPECIES_COLOR_KEYS = [
+  "red", "orange", "yellow", "green", "blue", "indigo", "violet", "white", "black", "gold", "silver", "bronze",
+] as const;
+export type TokenmonColor = (typeof SPECIES_COLOR_KEYS)[number];
+
+/** 프로젝트명으로 색을 뽑는다 — 종 해시와 다른 시드를 써서 독립적으로 굴린다. */
+export function colorOf(projectName: string): TokenmonColor {
+  let hash = 7;
+  for (let i = 0; i < projectName.length; i += 1) hash = (hash * 37 + projectName.charCodeAt(i) + 11) >>> 0;
+  return SPECIES_COLOR_KEYS[hash % SPECIES_COLOR_KEYS.length];
 }
 
 export interface TokenmonSession {
@@ -119,15 +125,14 @@ export interface TokenmonRateWindow {
   resetsAtMs: number | null;
 }
 
-/** 프로젝트가 키우는 캐릭터 — 그 프로젝트의 모든 세션이 먹이를 준다. 종족은 프로젝트명 해시로 고정. */
+/** 프로젝트가 키우는 캐릭터 — 그 프로젝트의 모든 세션이 먹이를 준다. 종족·색은 프로젝트명 해시로 고정. */
 export interface TokenmonPet {
   projectName: string;
   species: TokenmonSpecies;
-  /** 1~20. */
+  color: TokenmonColor;
+  /** 1~20. Lv.1은 아직 알. */
   level: number;
   maxLevel: boolean;
-  /** 레벨 구간에 따른 스프라이트 형태. */
-  stage: TokenmonStage;
   xp: number;
   /** 다음 레벨까지 진행률(0~100). 만렙이면 100. */
   levelProgressPct: number;
@@ -186,14 +191,6 @@ export const LEVEL_XP: readonly number[] = [
 export function levelOf(xp: number): number {
   for (let level = MAX_LEVEL; level >= 2; level -= 1) if (xp >= LEVEL_XP[level]) return level;
   return 1;
-}
-
-/** 레벨 구간 → 스프라이트 형태: 알 Lv.1, 아기 Lv.2~7, 어른 Lv.8~14, 황금킹 Lv.15~20. */
-export function stageOfLevel(level: number): TokenmonStage {
-  if (level >= 15) return "dragon";
-  if (level >= 8) return "pet";
-  if (level >= 2) return "baby";
-  return "egg";
 }
 
 const ACTIVE_WINDOW_MS = 3 * 60_000;
@@ -379,9 +376,9 @@ export function deriveTokenmonState(
       return {
         projectName,
         species: speciesOf(projectName),
+        color: colorOf(projectName),
         level,
         maxLevel: level >= MAX_LEVEL,
-        stage: stageOfLevel(level),
         xp,
         levelProgressPct: next === null ? 100 : Math.max(0, Math.min(100, Math.round(((xp - current) / (next - current)) * 100))),
         nextLevelXp: next,
