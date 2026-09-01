@@ -1,0 +1,27 @@
+{
+  "name": "tokenmon",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A pixel tamagotchi for your Claude Code usage — grows as you code, gets sleepy near your rate limit, naps until it resets.",
+  "license": "MIT",
+  "author": "Sunhong Min",
+  "scripts": {
+    "dev": "next dev -p 4242",
+    "build": "next build",
+    "start": "next start -p 4242",
+    "typecheck": "tsc --noEmit",
+    "setup": "node scripts/setup.js",
+    "remove": "node scripts/setup.js --uninstall"
+  },
+  "dependencies": {
+    "next": "^16.3.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "typescript": "^7.0.2"
+  }
+}
