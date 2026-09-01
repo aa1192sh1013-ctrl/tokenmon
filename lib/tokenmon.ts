@@ -64,7 +64,7 @@ export function parseTokenmonSnapshot(text: string): TokenmonSnapshot | null {
 
 /* ---------- 화면이 쓰는 파생 상태 ---------- */
 
-export type TokenmonMood = "happy" | "content" | "sleepy" | "exhausted" | "sleeping";
+export type TokenmonMood = "happy" | "content" | "sleeping" | "starving";
 export type TokenmonStage = "egg" | "baby" | "pet" | "dragon";
 export type TokenmonSpecies = "sprout" | "ocean" | "star" | "sunset" | "blossom" | "dino" | "unicorn" | "dragonet";
 
@@ -116,6 +116,8 @@ export interface TokenmonPet {
   mood: TokenmonMood;
   /** 이 프로젝트의 세션이 최근 3분 안에 갱신됨 = 지금 작업 중. */
   active: boolean;
+  /** 굶주림으로 깎여 있는 XP 비율(0~100). 다시 활동하면 전액 회복된다. */
+  hungerPct: number;
   sessionCount: number;
   outputTokens: number;
   costUsd: number;
@@ -132,6 +134,14 @@ export interface TokenmonState {
   activeSessionCount: number;
   fiveHour: TokenmonRateWindow | null;
   sevenDay: TokenmonRateWindow | null;
+  /** 이미 리셋된 직전 5시간 창에서 관측된 낭비율(0~100). 관측 불가면 null. */
+  wastedFiveHourPct: number | null;
+  /** 연속 출석 일수 — 오늘 아직 안 썼어도 어제까지의 연속은 유지. */
+  streakDays: number;
+  /** 오늘 한 번이라도 사용했는지 — 스트릭 소멸 경고용. */
+  fedToday: boolean;
+  /** 굶주림 감가가 진행 중인 캐릭터 수. */
+  starvingCount: number;
   lastActivityAt: string | null;
   totals: {
     inputTokens: number;
@@ -169,6 +179,9 @@ export function stageOfLevel(level: number): TokenmonStage {
 
 const ACTIVE_WINDOW_MS = 3 * 60_000;
 const FRESH_ACTIVITY_MS = 10 * 60_000;
+/** 굶주림 감가 튜닝값 — 3일 유예 후 하루 3%씩 XP가 말라간다(복리). 다시 활동하면 전액 회복. 한 달 방치 시 약 -56%. */
+const HUNGER_GRACE_DAYS = 3;
+const HUNGER_DECAY_PER_DAY = 0.03;
 
 /** 종족 뽑기표(1000분율) — 흔한 5종 각 18%, 레어: 공룡봇 5% · 유니뿅 3% · 용용봇 2%. */
 const SPECIES_TABLE: readonly { species: TokenmonSpecies; upTo: number }[] = [
@@ -241,22 +254,50 @@ function matchesAnyPattern(name: string, patterns: string[]): boolean {
   });
 }
 
-/** 최신 스냅샷부터 훑어 해당 창의 유효한 값(리셋 시각이 지나지 않은 것)을 찾는다. */
-function newestWindow(
+/**
+ * 유효한(아직 리셋 전) 창들 중 최선값을 고른다 — 더 새 창 우선,
+ * 같은 창(리셋 시각 동일)이면 최대 사용률. 사용률은 창 안에서 단조증가하므로
+ * idle 세션이 계속 내보내는 낡은 값이 신선한 값을 가리지 못한다.
+ */
+function bestRateWindow(
   sorted: TokenmonSnapshot[],
   key: "five_hour" | "seven_day",
   nowMs: number,
 ): TokenmonRateWindow | null {
+  let best: TokenmonRateWindow | null = null;
   for (const snapshot of sorted) {
     const window = snapshot.payload.rate_limits?.[key];
     const usedPct = num(window?.used_percentage);
     if (usedPct === null) continue;
     const resetsAtSec = num(window?.resets_at);
     const resetsAtMs = resetsAtSec === null ? null : resetsAtSec * 1000;
-    if (resetsAtMs !== null && resetsAtMs <= nowMs) return null; // 창이 이미 리셋됨 — 남은 기록은 낡은 값
-    return { usedPct, resetsAtMs };
+    if (resetsAtMs !== null && resetsAtMs <= nowMs) continue; // 이미 리셋된 창
+    if (!best) {
+      best = { usedPct, resetsAtMs };
+      continue;
+    }
+    const bestTime = best.resetsAtMs ?? 0;
+    const thisTime = resetsAtMs ?? 0;
+    if (thisTime > bestTime || (thisTime === bestTime && usedPct > best.usedPct)) best = { usedPct, resetsAtMs };
   }
-  return null;
+  return best;
+}
+
+/** 이미 리셋돼 버린 직전 창에서 마지막으로 관측된 사용률 — "지난 밥그릇 낭비" 계산용. */
+function lastExpiredWindowUsedPct(sorted: TokenmonSnapshot[], key: "five_hour" | "seven_day", nowMs: number): number | null {
+  let best: { usedPct: number; resetsAtMs: number } | null = null;
+  for (const snapshot of sorted) {
+    const window = snapshot.payload.rate_limits?.[key];
+    const usedPct = num(window?.used_percentage);
+    if (usedPct === null) continue;
+    const resetsAtSec = num(window?.resets_at);
+    if (resetsAtSec === null) continue;
+    const resetsAtMs = resetsAtSec * 1000;
+    if (resetsAtMs > nowMs) continue; // 아직 유효한 창
+    if (!best || resetsAtMs > best.resetsAtMs || (resetsAtMs === best.resetsAtMs && usedPct > best.usedPct))
+      best = { usedPct, resetsAtMs };
+  }
+  return best ? best.usedPct : null;
 }
 
 /** 출력 토큰 + 실제 작업 시간 + 코드 변경량으로 세션 XP를 계산한다. */
@@ -268,11 +309,9 @@ export function sessionXp(session: TokenmonSession): number {
   );
 }
 
-function petMood(active: boolean, fiveHour: TokenmonRateWindow | null, sinceActivityMs: number): TokenmonMood {
+function petMood(active: boolean, starving: boolean, sinceActivityMs: number): TokenmonMood {
+  if (starving) return "starving"; // 방치 → XP가 마르는 중
   if (!active) return "sleeping";
-  if (fiveHour && fiveHour.usedPct >= 99.5) return "sleeping";
-  if (fiveHour && fiveHour.usedPct >= 90) return "exhausted";
-  if (fiveHour && fiveHour.usedPct >= 70) return "sleepy";
   return sinceActivityMs <= FRESH_ACTIVITY_MS ? "happy" : "content";
 }
 
@@ -296,7 +335,7 @@ export function deriveTokenmonState(
   const allSessions = sorted.map(toSession);
   const liveSessions = allSessions.filter((session) => !isBackfillSession(session.id));
 
-  const fiveHour = newestWindow(sorted, "five_hour", nowMs);
+  const fiveHour = bestRateWindow(sorted, "five_hour", nowMs);
 
   const ignoredDirs = new Set((options.ignoreProjectDirs ?? []).map(normalizeDir));
   const ignoredPrefixes = (options.ignoreProjectDirPrefixes ?? []).map(normalizeDir);
@@ -315,13 +354,21 @@ export function deriveTokenmonState(
 
   const pets: TokenmonPet[] = [...byProject.entries()]
     .map(([projectName, group]) => {
-      const xp = group.reduce((sum, session) => sum + sessionXp(session), 0);
-      const level = levelOf(xp);
-      const current = LEVEL_XP[level];
-      const next = level >= MAX_LEVEL ? null : LEVEL_XP[level + 1];
+      const rawXp = group.reduce((sum, session) => sum + sessionXp(session), 0);
       const liveGroup = group.filter((session) => !isBackfillSession(session.id));
       const lastSeenMs = Math.max(...group.map((session) => Date.parse(session.savedAt)));
       const active = liveGroup.some((session) => nowMs - Date.parse(session.savedAt) <= ACTIVE_WINDOW_MS);
+
+      // 굶주림 감가 — 유예 지나면 하루 3%씩 XP가 마른다. 다시 활동하면 전액 회복(원본 XP는 보존).
+      const idleDays = Math.floor(Math.max(0, nowMs - lastSeenMs) / 86_400_000);
+      const hungerDays = active ? 0 : Math.max(0, idleDays - HUNGER_GRACE_DAYS);
+      const decay = Math.pow(1 - HUNGER_DECAY_PER_DAY, hungerDays);
+      const xp = Math.floor(rawXp * decay);
+      const hungerPct = Math.round((1 - decay) * 100);
+
+      const level = levelOf(xp);
+      const current = LEVEL_XP[level];
+      const next = level >= MAX_LEVEL ? null : LEVEL_XP[level + 1];
       return {
         projectName,
         species: speciesOf(projectName),
@@ -331,8 +378,9 @@ export function deriveTokenmonState(
         xp,
         levelProgressPct: next === null ? 100 : Math.max(0, Math.min(100, Math.round(((xp - current) / (next - current)) * 100))),
         nextLevelXp: next,
-        mood: petMood(active, fiveHour, nowMs - lastSeenMs),
+        mood: petMood(active, hungerDays > 0, nowMs - lastSeenMs),
         active,
+        hungerPct,
         sessionCount: liveGroup.length + group.reduce((sum, session) => sum + session.historySessions, 0),
         outputTokens: group.reduce((sum, session) => sum + session.outputTokens, 0),
         costUsd: Number(group.reduce((sum, session) => sum + (session.costUsd ?? 0), 0).toFixed(2)),
@@ -340,6 +388,17 @@ export function deriveTokenmonState(
       };
     })
     .sort((a, b) => Number(b.active) - Number(a.active) || Date.parse(b.lastSeenAt) - Date.parse(a.lastSeenAt));
+
+  // 연속 출석 스트릭 — 오늘 아직 안 썼어도 어제까지의 연속은 살아있다.
+  const dayKeys = new Set(allSessions.map((session) => new Date(session.savedAt).toDateString()));
+  const fedToday = dayKeys.has(new Date(nowMs).toDateString());
+  let streakDays = 0;
+  const cursor = new Date(nowMs);
+  if (!fedToday) cursor.setDate(cursor.getDate() - 1);
+  while (dayKeys.has(cursor.toDateString())) {
+    streakDays += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
 
   const activeSessionCount = pets.filter((pet) => pet.active).length;
   const lastActivityMs = allSessions.length ? Date.parse(allSessions[0].savedAt) : null;
@@ -358,7 +417,14 @@ export function deriveTokenmonState(
     pets,
     activeSessionCount,
     fiveHour,
-    sevenDay: newestWindow(sorted, "seven_day", nowMs),
+    sevenDay: bestRateWindow(sorted, "seven_day", nowMs),
+    wastedFiveHourPct: (() => {
+      const used = lastExpiredWindowUsedPct(sorted, "five_hour", nowMs);
+      return used === null ? null : Math.max(0, Math.round(100 - used));
+    })(),
+    streakDays,
+    fedToday,
+    starvingCount: pets.filter((pet) => pet.mood === "starving").length,
     lastActivityAt: lastActivityMs === null ? null : new Date(lastActivityMs).toISOString(),
     totals,
   };

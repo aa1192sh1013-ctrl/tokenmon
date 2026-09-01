@@ -375,11 +375,10 @@ function gridFor(species: TokenmonSpecies, stage: TokenmonStage, stageProgressPc
 const STAGE_LABEL: Record<TokenmonStage, string> = { egg: "알", baby: "아기", pet: "어른", dragon: "황금킹" };
 
 const SAY_LINES: Record<TokenmonMood, string[]> = {
-  happy: ["바이브 코딩 가보자고!", "토큰 냠냠, 순항 중"],
-  content: ["다음 작업 기다리는 중…", "평화로운 코딩 라이프"],
-  sleepy: ["한도가 차오르고 있어… 하암", "슬슬 졸린데…"],
-  exhausted: ["한도가 거의 다 찼어… 녹초야", "리셋까지 조금만…"],
+  happy: ["냠냠! 오늘도 잘 먹었다!", "바이브 코딩 가보자고!"],
+  content: ["다음 끼니 기다리는 중…", "평화로운 코딩 라이프"],
   sleeping: ["쿨쿨…"],
+  starving: ["배고파… 시들고 있어요"],
 };
 
 type EyeStyle = "open" | "half" | "closed";
@@ -405,7 +404,6 @@ function SpriteSvg({
   grid,
   palette,
   eye,
-  mood,
   golden,
   size,
   label,
@@ -413,7 +411,6 @@ function SpriteSvg({
   grid: string[];
   palette: Palette;
   eye: EyeStyle;
-  mood: TokenmonMood;
   golden: boolean;
   size: number;
   label: string;
@@ -433,12 +430,6 @@ function SpriteSvg({
         <>
           <Sparkle cx={1.3} cy={1.2} size={1.5} />
           <Sparkle cx={11} cy={6.2} size={1.1} />
-        </>
-      )}
-      {mood === "exhausted" && (
-        <>
-          <circle cx={10.35} cy={2.1} r={0.42} fill="#8fb3d6" />
-          <circle cx={10.95} cy={3} r={0.28} fill="#8fb3d6" />
         </>
       )}
     </svg>
@@ -473,28 +464,30 @@ export function TokenmonPetCard({ pet }: { pet: TokenmonPet }) {
   }, []);
 
   const info = SPECIES_INFO[species];
-  const eye: EyeStyle = mood === "sleeping" ? "closed" : blinking ? "closed" : mood === "sleepy" || mood === "exhausted" ? "half" : "open";
+  const eye: EyeStyle = mood === "sleeping" ? "closed" : blinking ? "closed" : mood === "starving" ? "half" : "open";
   const lines = SAY_LINES[mood];
   const line = lines[sayIndex % lines.length];
-  const say = !pet.active
-    ? "쿨쿨…"
-    : stage === "egg"
-      ? "…(알 속에서 꼬물꼬물)"
-      : mood === "happy" || mood === "content"
-        ? `${info.cry} ${line}`
-        : line;
+  const say =
+    mood === "starving"
+      ? `🥀 굶주림 XP -${pet.hungerPct}% — 돌아오면 회복돼요`
+      : !pet.active
+        ? "쿨쿨…"
+        : stage === "egg"
+          ? "…(알 속에서 꼬물꼬물)"
+          : mood === "happy" || mood === "content"
+            ? `${info.cry} ${line}`
+            : line;
   const label = `${info.label} — Lv.${pet.level} ${STAGE_LABEL[stage]}, ${projectName}`;
 
   return (
-    <div className={`tm-pet-card ${pet.active ? "" : "inactive"}`}>
+    <div className={`tm-pet-card ${pet.active ? "" : "inactive"} ${mood === "starving" ? "starving" : ""}`}>
       {pet.active && <span className="tm-awake" title="지금 열려 있는 세션" />}
       {info.rare && <span className="tm-rare">✨RARE</span>}
-      <div className={`tm-sprite-wrap ${mood === "sleeping" ? "tm-breathe" : "tm-bob"}`}>
+      <div className={`tm-sprite-wrap ${mood === "sleeping" || mood === "starving" ? "tm-breathe" : "tm-bob"}`}>
         <SpriteSvg
           grid={gridFor(species, stage, pet.levelProgressPct)}
           palette={paletteFor(species, stage)}
           eye={eye}
-          mood={mood}
           golden={stage === "dragon"}
           size={68}
           label={label}
@@ -502,6 +495,11 @@ export function TokenmonPetCard({ pet }: { pet: TokenmonPet }) {
         {mood === "sleeping" && (
           <span className="tm-zzz" aria-hidden>
             💤
+          </span>
+        )}
+        {mood === "starving" && (
+          <span className="tm-wilt" aria-hidden>
+            🥀
           </span>
         )}
       </div>

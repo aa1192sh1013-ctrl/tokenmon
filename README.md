@@ -6,9 +6,9 @@ Tired of typing `/usage` to check your Claude Code limits? Tokenmon turns your u
 
 - **Every project raises its own character**: each project rolls one of **8 animal-robot species** — 5 common (18% each) and 3 rare ✨ — picked deterministically from the project name (the egg's speckles hint at what's inside). Every Claude Code session in that project feeds it. Projects you're working on right now are awake; the rest nap in the roster 💤. Browse them all at `/gallery`.
 - **Lv.1–20 with a real grind**: maxing a character out (👑MAX, 500k XP) takes about a month of genuinely unhinged daily usage. Casual use gets you there in a year. No shortcuts.
-- **Summary up top**: fatigue gauge = your 5-hour rate limit, life gauge = your weekly limit — both with live reset countdowns — plus per-session token bars and totals.
-- At 70% usage everyone gets sleepy 😪, at 90% exhausted 🥵, at 100% they sleep 😴 until the window resets.
-- **Real numbers, not just percentages**: per-session input/output tokens and API-equivalent cost.
+- **Don't waste what you already paid for**: the 5-hour bowl and weekly bucket gauges show how much of your subscription capacity you've actually eaten — whatever's left at reset **evaporates** 💸. The panel counts down to the next evaporation and reports how much you wasted last window.
+- **Neglect has consequences**: leave a project untouched for 3+ days and its character starts starving 🥀 — XP withers ~3% a day and levels can drop — until one session restores it in full. Skip a day and your streak 🔥 is gone.
+- **Real numbers, not just percentages**: per-session output tokens up front; input (cache included) and cost in the table.
 - A **terminal status line** too: `😊 Tokenmon │ Opus │ 5h ▰▰▱▱ 42% │ wk 22% │ tok 43.9k │ ctx 4% │ $0.44`
 
 Everything runs **100% locally**. No conversation content is ever read or stored — only usage numbers.

@@ -89,19 +89,25 @@ code { padding: 1px 5px; border-radius: 4px; background: var(--soft); font-size:
 .tm-meter-title { font-weight: 700; }
 .tm-meter-val { font-size: 16px; font-weight: 750; letter-spacing: -.03em; }
 .tm-meter-track { overflow: hidden; height: 8px; margin-top: 6px; border-radius: 4px; }
-.tm-meter-track.ok { background: var(--accent-soft); }
-.tm-meter-track.warn { background: #f2ead9; }
 .tm-meter-track.danger { background: #f0e2e2; }
+.tm-meter-track.warn { background: #f2ead9; }
+.tm-meter-track.good { background: var(--accent-soft); }
+.tm-meter-track.gold { background: #f5ecd8; }
 .tm-meter-fill { height: 100%; border-radius: 0 4px 4px 0; }
-.tm-meter-fill.ok { background: var(--accent); }
-.tm-meter-fill.warn { background: var(--warning); }
 .tm-meter-fill.danger { background: #9c5656; }
+.tm-meter-fill.warn { background: var(--warning); }
+.tm-meter-fill.good { background: var(--accent); }
+.tm-meter-fill.gold { background: #dfae3c; }
 .tm-meter-sub { margin: 5px 0 0; color: var(--muted); font-size: 11px; }
 .tm-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 4px; }
 .tm-stat { padding: 9px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); }
 .tm-stat-value { margin-top: 2px; font-size: 16px; font-weight: 750; letter-spacing: -.03em; white-space: nowrap; }
 .tm-stat-unit { color: var(--muted); font-size: 11px; font-weight: 600; }
-.tm-last-seen { margin: 9px 0 0; color: var(--muted); font-size: 11px; }
+.tm-coach { margin: 11px 0 0; color: var(--ink); font-size: 12px; font-weight: 650; }
+.tm-wasted { margin: 4px 0 0; color: var(--paused); font-size: 11px; }
+.tm-last-seen { margin: 5px 0 0; color: var(--muted); font-size: 11px; }
+.tm-wilt { position: absolute; top: -6px; right: -12px; font-size: 13px; }
+.tm-pet-card.starving svg { filter: grayscale(.55) opacity(.92); }
 
 .tm-chart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .tm-chart-title { font-size: 12px; font-weight: 700; }

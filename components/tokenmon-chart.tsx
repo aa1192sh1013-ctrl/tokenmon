@@ -7,8 +7,9 @@ const MAX_ROWS = 7;
 
 export function TokenmonChart({ sessions }: { sessions: TokenmonSession[] }) {
   const [hovered, setHovered] = useState<number | null>(null);
-  const rows = sessions.slice(0, MAX_ROWS);
-  const maxTotal = Math.max(...rows.map((row) => row.inputTokens + row.outputTokens), 1);
+  /* 막대는 출력 토큰 기준 — 캐시 포함 입력은 세션마다 수억까지 벌어져 스케일을 뭉갠다. 입력·비용은 툴팁과 표에. */
+  const rows = sessions.filter((session) => session.outputTokens > 0).slice(0, MAX_ROWS);
+  const maxOutput = Math.max(...rows.map((row) => row.outputTokens), 1);
 
   if (rows.length === 0) {
     return (
@@ -19,23 +20,14 @@ export function TokenmonChart({ sessions }: { sessions: TokenmonSession[] }) {
   }
 
   return (
-    <div className="tm-chart-col" aria-label="세션별 토큰 사용량">
+    <div className="tm-chart-col" aria-label="세션별 출력 토큰">
       <div className="tm-chart-head">
-        <span className="tm-chart-title">세션별 토큰</span>
-        <span className="tm-legend">
-          <span>
-            <i className="tm-swatch input" aria-hidden /> 입력(캐시 포함)
-          </span>
-          <span>
-            <i className="tm-swatch output" aria-hidden /> 출력
-          </span>
-        </span>
+        <span className="tm-chart-title">세션별 출력 토큰</span>
+        <span className="tm-legend">입력·비용은 표에서</span>
       </div>
       <div className="tm-bars">
         {rows.map((session, index) => {
-          const total = session.inputTokens + session.outputTokens;
-          const widthPct = (total / maxTotal) * 100;
-          const inputShare = total > 0 ? session.inputTokens / total : 0;
+          const widthPct = (session.outputTokens / maxOutput) * 100;
           return (
             <div
               className="tm-bar-row"
@@ -49,19 +41,13 @@ export function TokenmonChart({ sessions }: { sessions: TokenmonSession[] }) {
               </div>
               <div className="tm-bar-slot">
                 <div className="tm-bar-track" style={{ width: `${Math.max(widthPct, 2)}%` }}>
-                  {session.inputTokens > 0 && (
-                    <span
-                      className={`tm-seg input ${session.outputTokens === 0 ? "cap" : ""}`}
-                      style={{ flexGrow: inputShare }}
-                    />
-                  )}
-                  {session.outputTokens > 0 && <span className="tm-seg output cap" style={{ flexGrow: 1 - inputShare }} />}
+                  <span className="tm-seg output cap" style={{ flexGrow: 1 }} />
                 </div>
               </div>
-              <span className="tm-bar-total">{formatTokenCount(total)}</span>
+              <span className="tm-bar-total">{formatTokenCount(session.outputTokens)}</span>
               {hovered === index && (
                 <div className="tm-tip" role="status">
-                  입력 {formatTokenCount(session.inputTokens)} · 출력 {formatTokenCount(session.outputTokens)}
+                  출력 {formatTokenCount(session.outputTokens)} · 입력(캐시 포함) {formatTokenCount(session.inputTokens)}
                   <br />
                   {formatUsd(session.costUsd)}
                   {session.contextUsedPct !== null ? ` · 컨텍스트 ${Math.round(session.contextUsedPct)}%` : ""}

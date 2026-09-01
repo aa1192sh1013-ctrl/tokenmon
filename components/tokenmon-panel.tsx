@@ -44,6 +44,10 @@ export function TokenmonPanel({ state }: { state: TokenmonState }) {
           sevenDay={state.sevenDay}
           totals={state.totals}
           lastActivityAt={state.lastActivityAt}
+          streakDays={state.streakDays}
+          fedToday={state.fedToday}
+          wastedFiveHourPct={state.wastedFiveHourPct}
+          starvingCount={state.starvingCount}
         />
         <TokenmonChart sessions={state.sessions} />
       </div>

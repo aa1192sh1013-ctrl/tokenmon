@@ -34,6 +34,7 @@ function samplePet(species: TokenmonSpecies, level: number): TokenmonPet {
     nextLevelXp: next,
     mood: "happy",
     active: true,
+    hungerPct: 0,
     sessionCount: level * 3,
     outputTokens: xp * 22,
     costUsd: Number((xp / 900).toFixed(2)),
