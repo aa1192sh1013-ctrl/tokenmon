@@ -433,9 +433,9 @@ function rigQuad(c: Ctx): RigOut {
   const bh = low ? 18 : 24;
   const bx = low ? 26 : 30;
   const bw = low ? 54 : 48;
-  const hx = longNeck ? 27 : 22;
-  const hy = longNeck ? 20 : low ? 52 : 36;
-  const hr = longNeck ? 8 : 10;
+  const hx = longNeck ? 27 : 24;
+  const hy = longNeck ? 20 : low ? 52 : 34;
+  const hr = longNeck ? 8 : 11;
   const legTop = by + bh - 6;
   const eyePos: [number, number] = [hx + 2, hy - 1.5];
 
@@ -450,6 +450,15 @@ function rigQuad(c: Ctx): RigOut {
       <path d={`M ${bx + bw - 16} ${by + bh - 9} a 9 9 0 0 1 13 -2`} fill="none" stroke={METAL_DARK} strokeWidth={1.8} />
       <Leg x={bx + bw - 3} topY={legTop + 2} />
       <Leg x={bx + 17} topY={legTop + 2} />
+      {/* 목 — 머리와 몸을 잇는 두꺼운 캡슐 (잉크 외곽 + 몸색) */}
+      {longNeck ? (
+        <rect x={hx - 4} y={hy} width={11} height={by - hy + 8} rx={5} fill={c.fill} {...S} strokeWidth={2.2} />
+      ) : (
+        <g>
+          <line x1={hx + 3} y1={hy + 2} x2={bx + 13} y2={by + 10} stroke={INK} strokeWidth={17} strokeLinecap="round" />
+          <line x1={hx + 3} y1={hy + 2} x2={bx + 13} y2={by + 10} stroke={c.base} strokeWidth={12.5} strokeLinecap="round" />
+        </g>
+      )}
       {/* 몸통 */}
       <rect x={bx} y={by} width={bw} height={bh} rx={low ? 9 : 12} fill={c.fill} {...S} strokeWidth={2.4} />
       {/* 등 장갑 밴드 + 심선 */}
@@ -458,12 +467,6 @@ function rigQuad(c: Ctx): RigOut {
       {/* 어깨 장갑 */}
       <circle cx={bx + 11} cy={by + 9} r={8} fill={METAL} stroke={INK} strokeWidth={2} />
       <circle cx={bx + 11} cy={by + 9} r={3.2} fill={METAL_DARK} />
-      {/* 목·머리 */}
-      {longNeck ? (
-        <rect x={hx - 4} y={hy} width={11} height={by - hy + 8} rx={5} fill={c.fill} {...S} strokeWidth={2.2} />
-      ) : (
-        <path d={`M ${bx + 2} ${by + 3} L ${hx + 3} ${hy - hr + 3} L ${hx + 8} ${hy + hr - 1} L ${bx + 8} ${by + bh - 4} Z`} fill={c.fill} stroke="none" />
-      )}
       {earOf(c.p.ear ?? "point", hx, hy, hr, c)}
       <circle cx={hx} cy={hy} r={hr} fill={c.fill} {...S} strokeWidth={2.4} />
       {muzzleOf(c.p.muzzle ?? "wolf", hx - hr + 3, hy + 1, c)}
@@ -602,7 +605,12 @@ function rigBird(c: Ctx): RigOut {
       <path d={`M ${bcx - 3} ${bcy - 3} Q ${bcx + 7} ${bcy - 5} ${bcx + 10} ${bcy + 1} M ${bcx - 4} ${bcy + 1} Q ${bcx + 4} ${bcy - 1} ${bcx + 8} ${bcy + 3}`} fill="none" stroke={METAL_DARK} strokeWidth={1.4} />
       {/* 목·머리 */}
       {longNeck && <path d={`M ${hx - 3} ${hy + 4} Q ${hx - 5} ${hy + 18} ${bcx - 10} ${bcy - 4} L ${bcx - 2} ${bcy + 4} Q ${hx + 5} ${hy + 20} ${hx + 4} ${hy + 5} Z`} fill={c.fill} {...S} strokeWidth={2.2} />}
-      {!longNeck && !upright && <path d={`M ${hx - 2} ${hy} L ${bcx - 6} ${bcy - 6} L ${bcx + 2} ${bcy + 2} L ${hx + 6} ${hy + 6} Z`} fill={c.fill} stroke="none" />}
+      {!longNeck && !upright && (
+        <g>
+          <line x1={hx + 2} y1={hy + 3} x2={bcx - 4} y2={bcy - 2} stroke={INK} strokeWidth={13} strokeLinecap="round" />
+          <line x1={hx + 2} y1={hy + 3} x2={bcx - 4} y2={bcy - 2} stroke={c.base} strokeWidth={9} strokeLinecap="round" />
+        </g>
+      )}
       <circle cx={hx} cy={hy} r={hr} fill={c.fill} {...S} strokeWidth={2.4} />
       {c.p.extras?.includes("discs") && <circle cx={eyePos[0]} cy={eyePos[1]} r={hr * 0.7} fill={lighten(c.base, 0.42)} stroke={darken(c.base, 0.2)} strokeWidth={1.6} />}
       {c.p.extras?.includes("tufts") && <path d={`M ${hx - 6} ${hy - hr + 2} L ${hx - 8} ${hy - hr - 6} L ${hx - 1} ${hy - hr + 1} Z`} fill={c.fill} {...S} strokeWidth={1.8} />}

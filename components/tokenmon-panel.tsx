@@ -9,7 +9,7 @@ import { TokenmonMeters } from "./tokenmon-meters";
 import { TokenmonPetCard } from "./tokenmon-pet";
 
 const REFRESH_MS = 5_000;
-const MAX_PETS = 12;
+const MAX_PETS = 60;
 
 export function TokenmonPanel({ state }: { state: TokenmonState }) {
   const router = useRouter();
