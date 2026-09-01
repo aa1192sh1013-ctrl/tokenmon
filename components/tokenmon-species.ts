@@ -690,13 +690,15 @@ export interface SpeciesDef {
   baby: string[];
   adult: string[];
   colors: Palette;
+  /** 벡터 렌더러가 쓰는 형태 키 — 흔한 종은 과(科) 키, 레어는 자기 ID. */
+  shape: string;
   /** 알 반점 색 — 몸색이 너무 연한 종족용 힌트 색. */
   hint?: string;
   rare?: boolean;
   rareKind?: "dino" | "mythic";
 }
 
-const RARE_DEFS: Record<string, SpeciesDef> = {
+const RARE_DEFS: Record<string, Omit<SpeciesDef, "shape">> = {
   tyranno: {
     label: "티라노봇",
     cry: "쿠앙!",
@@ -799,6 +801,7 @@ const FALLBACK: SpeciesDef = {
   baby: CAT_BABY,
   adult: CAT_ADULT,
   colors: PALETTES.charcoal.colors,
+  shape: "cat",
 };
 
 const cache = new Map<string, SpeciesDef>();
@@ -810,14 +813,21 @@ export function getSpeciesInfo(species: TokenmonSpecies): SpeciesDef {
   let def: SpeciesDef;
   const rare = RARE_DEFS[species];
   if (rare) {
-    def = rare;
+    def = { ...rare, shape: species };
   } else {
     const parsed = parseSpeciesId(species);
     const family = parsed ? FAMILIES[parsed.family as keyof typeof FAMILIES] : undefined;
     const palette = parsed ? PALETTES[parsed.palette] : undefined;
     def =
       family && palette
-        ? { label: `${palette.prefix}${family.label}봇`, cry: family.cry, baby: family.baby, adult: family.adult, colors: palette.colors }
+        ? {
+            label: `${palette.prefix}${family.label}봇`,
+            cry: family.cry,
+            baby: family.baby,
+            adult: family.adult,
+            colors: palette.colors,
+            shape: parsed ? parsed.family : "cat",
+          }
         : FALLBACK;
   }
   cache.set(species, def);
