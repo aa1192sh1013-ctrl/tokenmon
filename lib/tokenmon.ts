@@ -64,7 +64,7 @@ export function parseTokenmonSnapshot(text: string): TokenmonSnapshot | null {
 
 export type TokenmonMood = "happy" | "content" | "sleepy" | "exhausted" | "sleeping";
 export type TokenmonStage = "egg" | "baby" | "pet" | "dragon";
-export type TokenmonSpecies = "sprout" | "ocean" | "star" | "sunset" | "blossom";
+export type TokenmonSpecies = "sprout" | "ocean" | "star" | "sunset" | "blossom" | "dino" | "unicorn" | "dragonet";
 
 export interface TokenmonSession {
   id: string;
@@ -130,13 +130,26 @@ export const SESSION_STAGE_XP = { baby: 120, pet: 1200, dragon: 5000 } as const;
 const ACTIVE_WINDOW_MS = 3 * 60_000;
 const FRESH_ACTIVITY_MS = 10 * 60_000;
 
-const SPECIES_ORDER: readonly TokenmonSpecies[] = ["sprout", "ocean", "star", "sunset", "blossom"];
+/** 종족 뽑기표(1000분율) — 흔한 5종 각 18%, 레어: 공룡봇 5% · 유니뿅 3% · 용용봇 2%. */
+const SPECIES_TABLE: readonly { species: TokenmonSpecies; upTo: number }[] = [
+  { species: "sunset", upTo: 180 },
+  { species: "star", upTo: 360 },
+  { species: "ocean", upTo: 540 },
+  { species: "blossom", upTo: 720 },
+  { species: "sprout", upTo: 900 },
+  { species: "dino", upTo: 950 },
+  { species: "unicorn", upTo: 980 },
+  { species: "dragonet", upTo: 1000 },
+];
+
+export const RARE_SPECIES: readonly TokenmonSpecies[] = ["dino", "unicorn", "dragonet"];
 
 /** 세션 ID로 종족을 결정한다 — 같은 세션은 언제나 같은 종족. */
 export function speciesOf(sessionId: string): TokenmonSpecies {
   let hash = 0;
   for (let i = 0; i < sessionId.length; i += 1) hash = (hash * 31 + sessionId.charCodeAt(i)) >>> 0;
-  return SPECIES_ORDER[hash % SPECIES_ORDER.length];
+  const roll = hash % 1000;
+  return (SPECIES_TABLE.find((row) => roll < row.upTo) ?? SPECIES_TABLE[0]).species;
 }
 
 function num(value: unknown): number | null {

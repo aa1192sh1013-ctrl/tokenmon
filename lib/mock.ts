@@ -63,7 +63,7 @@ export function mockTokenmonSnapshots(now: Date = new Date()): TokenmonSnapshot[
   const t = now.getTime();
   return [
     snapshot({
-      id: "mock-side-project",
+      id: "mock-side-project-1",
       project: "side-project",
       model: "Opus",
       atMs: t - 1 * MINUTE,
@@ -87,7 +87,7 @@ export function mockTokenmonSnapshots(now: Date = new Date()): TokenmonSnapshot[
       ctxPct: 18,
     }),
     snapshot({
-      id: "mock-web-app",
+      id: "mock-web-app-140",
       project: "web-app",
       model: "Opus",
       atMs: t - 20 * HOUR,
@@ -109,7 +109,7 @@ export function mockTokenmonSnapshots(now: Date = new Date()): TokenmonSnapshot[
       ctxPct: 12,
     }),
     snapshot({
-      id: "mock-weekend-hack",
+      id: "mock-weekend-hack-1",
       project: "weekend-hack",
       model: "Haiku",
       atMs: t - 2 * DAY - 6 * HOUR,

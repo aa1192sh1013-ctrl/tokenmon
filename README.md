@@ -4,7 +4,7 @@
 
 Tired of typing `/usage` to check your Claude Code limits? Tokenmon turns your usage into a little creature that lives in a local dashboard:
 
-- **Every session hatches its own character**: each Claude Code session gets one of 5 species (picked deterministically from the session id — the egg's speckles hint at the color) and evolves Egg → Baby → Pet → Dragon from that session's actual work. Open windows are awake; closed sessions nap in the roster 💤.
+- **Every session hatches its own character**: each Claude Code session rolls one of **8 animal-robot species** — 5 common (18% each) and 3 rare ✨ — picked deterministically from the session id (the egg's speckles hint at what's inside). It evolves Egg → Baby → Adult → Golden King from that session's actual work. Open windows are awake; closed sessions nap in the roster 💤. Browse them all at `/gallery`.
 - **Summary up top**: fatigue gauge = your 5-hour rate limit, life gauge = your weekly limit — both with live reset countdowns — plus per-session token bars and totals.
 - At 70% usage everyone gets sleepy 😪, at 90% exhausted 🥵, at 100% they sleep 😴 until the window resets.
 - **Real numbers, not just percentages**: per-session input/output tokens and API-equivalent cost.
@@ -63,12 +63,25 @@ Claude Code pipes session JSON into whatever command is configured as your [stat
 |---|---|---|
 | 🥚 Egg | 0 | a quick question or two (it cracks as it gets close to hatching) |
 | 🐣 Baby | 120 | a few minutes of real work |
-| 🐥 Pet | 1,200 | a solid working session |
-| 🐲 Dragon | 5,000 | a monster all-day session |
+| 🤖 Adult | 1,200 | a solid working session |
+| 👑 Golden King | 5,000 | a monster all-day session — gold trim + sparkles |
 
 Session XP = output tokens ÷ 25 + API minutes × 6 + changed lines × 2 — weighted toward *actual work done in the session*, not leaving a window open.
 
-Species (새싹몬 · 바다몬 · 별몬 · 노을몬 · 벚꽃몬) are assigned by hashing the session id, so every session's character is a small surprise.
+## Species gacha
+
+| Species | | Odds |
+|---|---|---|
+| 꽥꽥봇 | rubber-duck bot (wind-up key included) | 18% |
+| 냥냥봇 | steel cat bot with whiskers | 18% |
+| 펭펭봇 | navy penguin bot, LED belly | 18% |
+| 깡총봇 | pink bunny bot, antenna ear | 18% |
+| 개굴봇 | toy frog bot | 18% |
+| 공룡봇 ✨ | spiky dino bot | **5%** |
+| 유니뿅 ✨ | unicorn bot, golden horn | **3%** |
+| 용용봇 ✨ | winged dragonet bot | **2%** |
+
+The roll is a hash of the session id — deterministic, no rerolls, no crying.
 
 ## Uninstall
 

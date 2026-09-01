@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import type { TokenmonState } from "@/lib/tokenmon";
@@ -50,7 +51,10 @@ export function TokenmonPanel({ state }: { state: TokenmonState }) {
       <div className="tm-roster-head">
         <h3>세션 캐릭터</h3>
         <span>
-          {state.pets.length}마리 · 깨어 있음 {state.activeSessionCount}마리
+          {state.pets.length}마리 · 깨어 있음 {state.activeSessionCount}마리 ·{" "}
+          <Link className="tm-open-link" href="/gallery">
+            도감
+          </Link>
         </span>
       </div>
       {state.pets.length === 0 ? (

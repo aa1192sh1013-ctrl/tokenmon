@@ -74,9 +74,14 @@ code { padding: 1px 5px; border-radius: 4px; background: var(--soft); font-size:
 .tm-pet-card .tm-xp { margin-top: 7px; }
 .tm-pet-card .tm-say { min-height: 16px; font-size: 11px; }
 .tm-awake { position: absolute; top: 9px; right: 10px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.tm-rare { position: absolute; top: 7px; left: 9px; color: #a07818; font-size: 9px; font-weight: 750; letter-spacing: .04em; }
 .tm-card-sub { overflow: hidden; margin: 2px 0 0; color: var(--muted); font-size: 11px; white-space: nowrap; text-overflow: ellipsis; }
 .tm-card-stats { margin: 6px 0 0; color: var(--ink); font-size: 11px; font-weight: 600; }
 .tm-roster-more { margin: 9px 0 0; color: var(--muted); font-size: 11px; }
+.tm-gallery-row { margin-bottom: 18px; }
+.tm-gallery-odds { margin: 0 0 6px; color: var(--muted); font-size: 11px; font-weight: 700; }
+.tm-open-link { color: var(--muted); font-weight: 600; }
+.tm-open-link:hover { color: var(--ink); }
 
 .tm-meter { margin-bottom: 14px; }
 .tm-meter-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 12px; }
