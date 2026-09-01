@@ -11,6 +11,7 @@
     "start": "next start -p 4242",
     "typecheck": "tsc --noEmit",
     "setup": "node scripts/setup.js",
+    "backfill": "node scripts/backfill.js",
     "remove": "node scripts/setup.js --uninstall"
   },
   "dependencies": {

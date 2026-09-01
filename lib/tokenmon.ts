@@ -40,6 +40,8 @@ export interface TokenmonPayload {
     five_hour?: TokenmonRateWindowPayload | null;
     seven_day?: TokenmonRateWindowPayload | null;
   } | null;
+  /** 백필 스냅샷(`npm run backfill`) 전용 — 과거 기록 요약. */
+  backfill?: { sessions?: number | null; first_at?: string | null } | null;
 }
 
 export interface TokenmonSnapshot {
@@ -83,6 +85,13 @@ export interface TokenmonSession {
   apiDurationMs: number;
   /** 세션이 시작된 폴더의 원본 경로 — 잡폴더 필터링에 쓴다. */
   projectDir: string;
+  /** 백필 스냅샷이 대표하는 과거 세션 수(일반 세션은 0). */
+  historySessions: number;
+}
+
+/** 백필 의사 세션인지 — 성장·누적에는 포함하되 "최근 세션" 차트에서는 제외한다. */
+export function isBackfillSession(sessionId: string): boolean {
+  return sessionId.startsWith("backfill-");
 }
 
 export interface TokenmonRateWindow {
@@ -209,12 +218,27 @@ function toSession(snapshot: TokenmonSnapshot): TokenmonSession {
     linesRemoved: num(payload.cost?.total_lines_removed) ?? 0,
     apiDurationMs: num(payload.cost?.total_api_duration_ms) ?? 0,
     projectDir: payload.workspace?.project_dir ?? payload.workspace?.current_dir ?? payload.cwd ?? "",
+    historySessions: num(payload.backfill?.sessions) ?? 0,
   };
 }
 
 /** 경로 비교용 정규화 — 윈도우 경로는 대소문자·구분자 차이를 무시한다. */
 function normalizeDir(dir: string): string {
   return dir.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+}
+
+/** "vibesquad-plan-*" 같은 와일드카드(*) 패턴 매칭 — 대소문자 무시. */
+function matchesAnyPattern(name: string, patterns: string[]): boolean {
+  return patterns.some((pattern) => {
+    const regex = new RegExp(
+      `^${pattern
+        .split("*")
+        .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+        .join(".*")}$`,
+      "i",
+    );
+    return regex.test(name);
+  });
 }
 
 /** 최신 스냅샷부터 훑어 해당 창의 유효한 값(리셋 시각이 지나지 않은 것)을 찾는다. */
@@ -254,20 +278,36 @@ function petMood(active: boolean, fiveHour: TokenmonRateWindow | null, sinceActi
 
 export function deriveTokenmonState(
   snapshots: TokenmonSnapshot[],
-  options: { live: boolean; now?: Date; ignoreProjectDirs?: string[] },
+  options: {
+    live: boolean;
+    now?: Date;
+    /** 정확히 이 폴더에서 시작한 세션은 캐릭터를 만들지 않는다 (예: 홈 디렉터리). */
+    ignoreProjectDirs?: string[];
+    /** 이 경로 아래 전부 제외 (예: OS 임시 폴더 — 실험용 샌드박스들). */
+    ignoreProjectDirPrefixes?: string[];
+    /** 프로젝트 이름 와일드카드 제외 (예: "_*", "*-scratch") — 사용자 설정용. */
+    ignoreProjectNames?: string[];
+  },
 ): TokenmonState {
   const nowMs = (options.now ?? new Date()).getTime();
   const sorted = snapshots
     .slice()
     .sort((a, b) => Date.parse(b.savedAt) - Date.parse(a.savedAt));
-  const sessions = sorted.map(toSession);
+  const allSessions = sorted.map(toSession);
+  const liveSessions = allSessions.filter((session) => !isBackfillSession(session.id));
 
   const fiveHour = newestWindow(sorted, "five_hour", nowMs);
 
   const ignoredDirs = new Set((options.ignoreProjectDirs ?? []).map(normalizeDir));
+  const ignoredPrefixes = (options.ignoreProjectDirPrefixes ?? []).map(normalizeDir);
+  const ignoredNames = options.ignoreProjectNames ?? [];
   const byProject = new Map<string, TokenmonSession[]>();
-  for (const session of sessions) {
-    if (ignoredDirs.has(normalizeDir(session.projectDir))) continue; // 홈·다운로드 같은 잡폴더 세션은 캐릭터를 만들지 않는다 (사용량 집계에는 포함)
+  for (const session of allSessions) {
+    // 잡폴더 세션은 캐릭터를 만들지 않는다 (사용량 집계에는 포함)
+    const dir = normalizeDir(session.projectDir);
+    if (ignoredDirs.has(dir)) continue;
+    if (ignoredPrefixes.some((prefix) => dir === prefix || dir.startsWith(`${prefix}/`))) continue;
+    if (ignoredNames.length > 0 && matchesAnyPattern(session.projectName, ignoredNames)) continue;
     const group = byProject.get(session.projectName);
     if (group) group.push(session);
     else byProject.set(session.projectName, [session]);
@@ -279,8 +319,9 @@ export function deriveTokenmonState(
       const level = levelOf(xp);
       const current = LEVEL_XP[level];
       const next = level >= MAX_LEVEL ? null : LEVEL_XP[level + 1];
+      const liveGroup = group.filter((session) => !isBackfillSession(session.id));
       const lastSeenMs = Math.max(...group.map((session) => Date.parse(session.savedAt)));
-      const active = nowMs - lastSeenMs <= ACTIVE_WINDOW_MS;
+      const active = liveGroup.some((session) => nowMs - Date.parse(session.savedAt) <= ACTIVE_WINDOW_MS);
       return {
         projectName,
         species: speciesOf(projectName),
@@ -292,7 +333,7 @@ export function deriveTokenmonState(
         nextLevelXp: next,
         mood: petMood(active, fiveHour, nowMs - lastSeenMs),
         active,
-        sessionCount: group.length,
+        sessionCount: liveGroup.length + group.reduce((sum, session) => sum + session.historySessions, 0),
         outputTokens: group.reduce((sum, session) => sum + session.outputTokens, 0),
         costUsd: Number(group.reduce((sum, session) => sum + (session.costUsd ?? 0), 0).toFixed(2)),
         lastSeenAt: new Date(lastSeenMs).toISOString(),
@@ -301,19 +342,19 @@ export function deriveTokenmonState(
     .sort((a, b) => Number(b.active) - Number(a.active) || Date.parse(b.lastSeenAt) - Date.parse(a.lastSeenAt));
 
   const activeSessionCount = pets.filter((pet) => pet.active).length;
-  const lastActivityMs = sessions.length ? Date.parse(sessions[0].savedAt) : null;
+  const lastActivityMs = allSessions.length ? Date.parse(allSessions[0].savedAt) : null;
 
   const totals = {
-    inputTokens: sessions.reduce((sum, session) => sum + session.inputTokens, 0),
-    outputTokens: sessions.reduce((sum, session) => sum + session.outputTokens, 0),
-    costUsd: Number(sessions.reduce((sum, session) => sum + (session.costUsd ?? 0), 0).toFixed(2)),
-    sessionCount: sessions.length,
-    activeDays: new Set(sessions.map((session) => new Date(session.savedAt).toDateString())).size,
+    inputTokens: allSessions.reduce((sum, session) => sum + session.inputTokens, 0),
+    outputTokens: allSessions.reduce((sum, session) => sum + session.outputTokens, 0),
+    costUsd: Number(allSessions.reduce((sum, session) => sum + (session.costUsd ?? 0), 0).toFixed(2)),
+    sessionCount: liveSessions.length + allSessions.reduce((sum, session) => sum + session.historySessions, 0),
+    activeDays: new Set(allSessions.map((session) => new Date(session.savedAt).toDateString())).size,
   };
 
   return {
     live: options.live,
-    sessions,
+    sessions: liveSessions,
     pets,
     activeSessionCount,
     fiveHour,

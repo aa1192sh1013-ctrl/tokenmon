@@ -31,6 +31,20 @@ npm run dev       # dashboard at http://localhost:4242
 
 Then open a new Claude Code session anywhere and do anything — your Tokenmon hatches within seconds.
 
+**Already a Claude Code user?** Pull your past months of usage into the ranch:
+
+```bash
+npm run backfill
+```
+
+It scans your local `~/.claude/projects` transcripts and aggregates **numbers only** (tokens, timestamps — conversation content is never stored) into one history summary per project, so your characters instantly reflect your real track record. Safe to re-run any time: summaries are overwritten and live-collected sessions are never double-counted. History XP counts output tokens only (÷25), since API minutes and changed lines aren't recorded in transcripts.
+
+**Keeping the ranch tidy**: sessions started in your home directory, Desktop/Downloads/Documents, or anywhere under the OS temp folder never hatch characters (their usage still counts in the totals). To exclude more by name, create `~/.claude/tokenmon/config.json`:
+
+```json
+{ "ignoreProjects": ["_*", "*-sandbox"] }
+```
+
 Want it as a desktop widget? Open it in browser app mode:
 
 ```bash
