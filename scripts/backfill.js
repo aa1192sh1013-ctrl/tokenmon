@@ -89,7 +89,7 @@ async function main() {
       .readdirSync(SESSIONS_DIR)
       .filter((name) => name.endsWith(".json") && !name.startsWith("backfill-"))
       .map((name) => name.slice(0, -5)),
-  );
+  ); // transcript-<id>.json 항목은 그대로 들어와서 위의 transcript- 비교와 맞물린다
 
   const projectDirs = fs.readdirSync(PROJECTS_DIR, { withFileTypes: true }).filter((entry) => entry.isDirectory());
   let grandOutput = 0;
@@ -108,7 +108,8 @@ async function main() {
     const agg = { input: 0, cacheCreate: 0, cacheRead: 0, output: 0, sessions: 0, skipped: 0, firstMs: Infinity, lastMs: 0, cwd: null };
     for (const file of files) {
       const sessionId = file.slice(0, -6);
-      if (liveIds.has(sanitize(sessionId))) {
+      // statusline 수집분과 실시간 테일링분은 건너뛴다 (중복 방지)
+      if (liveIds.has(sanitize(sessionId)) || liveIds.has(sanitize(`transcript-${sessionId}`))) {
         agg.skipped += 1;
         continue;
       }

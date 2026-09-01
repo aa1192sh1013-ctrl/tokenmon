@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { mockTokenmonSnapshots } from "@/lib/mock";
 import { deriveTokenmonState, parseTokenmonSnapshot, type TokenmonSnapshot } from "@/lib/tokenmon";
 import { TokenmonPanel } from "./tokenmon-panel";
+import { readActiveTranscriptSnapshots, sanitizeSessionId } from "./transcript-tail";
 
 const sessionsDir = join(homedir(), ".claude", "tokenmon", "sessions");
 
@@ -41,8 +42,18 @@ function readIgnoreProjectNames(): string[] {
   }
 }
 
-export function TokenmonSection() {
-  const real = readSnapshots();
+export async function TokenmonSection() {
+  const persisted = readSnapshots();
+  // statusline 수집기가 담당 중인 세션은 테일링에서 제외 (statusline 쪽 데이터가 더 풍부)
+  const statuslineIds = new Set(
+    persisted
+      .map((snapshot) => snapshot.payload.session_id ?? "")
+      .filter((id) => id !== "" && !id.startsWith("backfill-") && !id.startsWith("transcript-"))
+      .map(sanitizeSessionId),
+  );
+  const tailed = await readActiveTranscriptSnapshots(statuslineIds);
+  const tailedIds = new Set(tailed.map((snapshot) => snapshot.payload.session_id));
+  const real = [...persisted.filter((snapshot) => !tailedIds.has(snapshot.payload.session_id)), ...tailed];
   const live = real.length > 0;
   const state = deriveTokenmonState(live ? real : mockTokenmonSnapshots(), {
     live,
