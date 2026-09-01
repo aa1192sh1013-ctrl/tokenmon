@@ -89,19 +89,26 @@ export interface TokenmonRateWindow {
   resetsAtMs: number | null;
 }
 
-/** 세션 하나가 키우는 캐릭터. */
+/** 프로젝트가 키우는 캐릭터 — 그 프로젝트의 모든 세션이 먹이를 준다. 종족은 프로젝트명 해시로 고정. */
 export interface TokenmonPet {
-  session: TokenmonSession;
-  /** 세션 ID 해시로 정해지는 고유 종족. */
+  projectName: string;
   species: TokenmonSpecies;
+  /** 1~20. */
+  level: number;
+  maxLevel: boolean;
+  /** 레벨 구간에 따른 스프라이트 형태. */
   stage: TokenmonStage;
   xp: number;
-  /** 현재 단계 안에서의 진행률(0~100). 최종 단계면 100. */
-  stageProgressPct: number;
-  nextStageXp: number | null;
+  /** 다음 레벨까지 진행률(0~100). 만렙이면 100. */
+  levelProgressPct: number;
+  nextLevelXp: number | null;
   mood: TokenmonMood;
-  /** 최근 3분 안에 스냅샷이 갱신됨 = 창이 지금 열려 있음. */
+  /** 이 프로젝트의 세션이 최근 3분 안에 갱신됨 = 지금 작업 중. */
   active: boolean;
+  sessionCount: number;
+  outputTokens: number;
+  costUsd: number;
+  lastSeenAt: string;
 }
 
 export interface TokenmonState {
@@ -124,8 +131,30 @@ export interface TokenmonState {
   };
 }
 
-/** 세션 내 진화 속도 튜닝값 — 짧은 문답 세션은 알, 한나절 작업 세션은 펫, 대형 세션만 용가리가 되도록 잡았다. */
-export const SESSION_STAGE_XP = { baby: 120, pet: 1200, dragon: 5000 } as const;
+export const MAX_LEVEL = 20;
+
+/**
+ * 레벨 n 도달에 필요한 누적 XP(인덱스=레벨, 0·1번은 미사용/0).
+ * 매일 종일 토큰을 태우는 개발자가 한 달쯤 갈아야 만렙(50만 XP)이 되도록 잡았다
+ * — 실사용 기준 그런 페이스가 월 40만~60만 XP쯤 나온다. 라이트 유저는 만렙까지 1년 안팎.
+ */
+export const LEVEL_XP: readonly number[] = [
+  0, 0, 120, 190, 300, 480, 760, 1_200, 1_900, 3_000, 4_800, 7_600, 12_000, 19_000, 30_000, 48_000, 76_000, 120_000,
+  190_000, 300_000, 500_000,
+];
+
+export function levelOf(xp: number): number {
+  for (let level = MAX_LEVEL; level >= 2; level -= 1) if (xp >= LEVEL_XP[level]) return level;
+  return 1;
+}
+
+/** 레벨 구간 → 스프라이트 형태: 알 Lv.1, 아기 Lv.2~7, 어른 Lv.8~14, 황금킹 Lv.15~20. */
+export function stageOfLevel(level: number): TokenmonStage {
+  if (level >= 15) return "dragon";
+  if (level >= 8) return "pet";
+  if (level >= 2) return "baby";
+  return "egg";
+}
 
 const ACTIVE_WINDOW_MS = 3 * 60_000;
 const FRESH_ACTIVITY_MS = 10 * 60_000;
@@ -207,20 +236,6 @@ export function sessionXp(session: TokenmonSession): number {
   );
 }
 
-function stageOf(xp: number): { stage: TokenmonStage; stageProgressPct: number; nextStageXp: number | null } {
-  const stage: TokenmonStage =
-    xp >= SESSION_STAGE_XP.dragon ? "dragon" : xp >= SESSION_STAGE_XP.pet ? "pet" : xp >= SESSION_STAGE_XP.baby ? "baby" : "egg";
-  const bounds: Record<TokenmonStage, [number, number | null]> = {
-    egg: [0, SESSION_STAGE_XP.baby],
-    baby: [SESSION_STAGE_XP.baby, SESSION_STAGE_XP.pet],
-    pet: [SESSION_STAGE_XP.pet, SESSION_STAGE_XP.dragon],
-    dragon: [SESSION_STAGE_XP.dragon, null],
-  };
-  const [start, end] = bounds[stage];
-  const stageProgressPct = end === null ? 100 : Math.max(0, Math.min(100, Math.round(((xp - start) / (end - start)) * 100)));
-  return { stage, stageProgressPct, nextStageXp: end };
-}
-
 function petMood(active: boolean, fiveHour: TokenmonRateWindow | null, sinceActivityMs: number): TokenmonMood {
   if (!active) return "sleeping";
   if (fiveHour && fiveHour.usedPct >= 99.5) return "sleeping";
@@ -238,20 +253,39 @@ export function deriveTokenmonState(snapshots: TokenmonSnapshot[], options: { li
 
   const fiveHour = newestWindow(sorted, "five_hour", nowMs);
 
-  const pets = sessions
-    .map((session) => {
-      const active = nowMs - Date.parse(session.savedAt) <= ACTIVE_WINDOW_MS;
-      const xp = sessionXp(session);
+  const byProject = new Map<string, TokenmonSession[]>();
+  for (const session of sessions) {
+    const group = byProject.get(session.projectName);
+    if (group) group.push(session);
+    else byProject.set(session.projectName, [session]);
+  }
+
+  const pets: TokenmonPet[] = [...byProject.entries()]
+    .map(([projectName, group]) => {
+      const xp = group.reduce((sum, session) => sum + sessionXp(session), 0);
+      const level = levelOf(xp);
+      const current = LEVEL_XP[level];
+      const next = level >= MAX_LEVEL ? null : LEVEL_XP[level + 1];
+      const lastSeenMs = Math.max(...group.map((session) => Date.parse(session.savedAt)));
+      const active = nowMs - lastSeenMs <= ACTIVE_WINDOW_MS;
       return {
-        session,
-        species: speciesOf(session.id),
+        projectName,
+        species: speciesOf(projectName),
+        level,
+        maxLevel: level >= MAX_LEVEL,
+        stage: stageOfLevel(level),
         xp,
-        ...stageOf(xp),
+        levelProgressPct: next === null ? 100 : Math.max(0, Math.min(100, Math.round(((xp - current) / (next - current)) * 100))),
+        nextLevelXp: next,
+        mood: petMood(active, fiveHour, nowMs - lastSeenMs),
         active,
-        mood: petMood(active, fiveHour, nowMs - Date.parse(session.savedAt)),
+        sessionCount: group.length,
+        outputTokens: group.reduce((sum, session) => sum + session.outputTokens, 0),
+        costUsd: Number(group.reduce((sum, session) => sum + (session.costUsd ?? 0), 0).toFixed(2)),
+        lastSeenAt: new Date(lastSeenMs).toISOString(),
       };
     })
-    .sort((a, b) => Number(b.active) - Number(a.active) || Date.parse(b.session.savedAt) - Date.parse(a.session.savedAt));
+    .sort((a, b) => Number(b.active) - Number(a.active) || Date.parse(b.lastSeenAt) - Date.parse(a.lastSeenAt));
 
   const activeSessionCount = pets.filter((pet) => pet.active).length;
   const lastActivityMs = sessions.length ? Date.parse(sessions[0].savedAt) : null;

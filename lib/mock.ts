@@ -2,7 +2,7 @@
  * Tokenmon 미리보기 데이터 — 수집기가 아직 스냅샷을 만들기 전에도
  * 화면이 살아 있는 모습으로 보이도록 하는 가짜 스냅샷 묶음.
  * 기준 시각(now)만 받아 항상 같은 모양을 만든다(난수 없음).
- * 세션별 진화 단계가 골고루 보이도록 값을 맞춰두었다(알~용가리).
+ * 프로젝트별 캐릭터 레벨이 알(Lv.1)부터 만렙(Lv.20)까지 골고루 보이도록 값을 맞춰두었다.
  */
 import type { TokenmonSnapshot } from "@/lib/tokenmon";
 
@@ -15,7 +15,6 @@ interface MockSessionSpec {
   project: string;
   model: string;
   atMs: number;
-  input: number;
   output: number;
   apiMin: number;
   cost: number;
@@ -39,7 +38,7 @@ function snapshot(spec: MockSessionSpec): TokenmonSnapshot {
         total_lines_removed: Math.round(spec.output / 2000),
       },
       context_window: {
-        total_input_tokens: spec.input,
+        total_input_tokens: spec.output * 8,
         total_output_tokens: spec.output,
         context_window_size: 200_000,
         used_percentage: spec.ctxPct,
@@ -62,62 +61,31 @@ function snapshot(spec: MockSessionSpec): TokenmonSnapshot {
 export function mockTokenmonSnapshots(now: Date = new Date()): TokenmonSnapshot[] {
   const t = now.getTime();
   return [
+    // side-project → 개굴봇 Lv.1 (부화 임박한 알, 지금 작업 중)
     snapshot({
-      id: "mock-side-project-1",
+      id: "mock-a1",
       project: "side-project",
       model: "Opus",
       atMs: t - 1 * MINUTE,
-      input: 182_000,
-      output: 24_300,
-      apiMin: 42,
-      cost: 1.84,
-      ctxPct: 42,
+      output: 1_400,
+      apiMin: 3,
+      cost: 0.21,
+      ctxPct: 9,
       fiveHour: { pct: 62, resetsAtMs: t + 110 * MINUTE },
       sevenDay: { pct: 38, resetsAtMs: t + 2.8 * DAY },
     }),
-    snapshot({
-      id: "mock-api-server",
-      project: "api-server",
-      model: "Sonnet",
-      atMs: t - 3 * HOUR,
-      input: 96_400,
-      output: 11_200,
-      apiMin: 18,
-      cost: 0.63,
-      ctxPct: 18,
-    }),
-    snapshot({
-      id: "mock-web-app-140",
-      project: "web-app",
-      model: "Opus",
-      atMs: t - 20 * HOUR,
-      input: 241_000,
-      output: 118_000,
-      apiMin: 95,
-      cost: 6.4,
-      ctxPct: 55,
-    }),
-    snapshot({
-      id: "mock-dotfiles",
-      project: "dotfiles",
-      model: "Sonnet",
-      atMs: t - 2 * DAY - 2 * HOUR,
-      input: 42_500,
-      output: 4_800,
-      apiMin: 9,
-      cost: 0.34,
-      ctxPct: 12,
-    }),
-    snapshot({
-      id: "mock-weekend-hack-1",
-      project: "weekend-hack",
-      model: "Haiku",
-      atMs: t - 2 * DAY - 6 * HOUR,
-      input: 8_200,
-      output: 900,
-      apiMin: 2,
-      cost: 0.04,
-      ctxPct: 4,
-    }),
+    // hoppy-notes → 깡총봇 Lv.5 아기
+    snapshot({ id: "mock-b1", project: "hoppy-notes", model: "Haiku", atMs: t - 3 * DAY, output: 11_000, apiMin: 12, cost: 0.35, ctxPct: 8 }),
+    // api-server → 펭펭봇 Lv.8 어른
+    snapshot({ id: "mock-c1", project: "api-server", model: "Sonnet", atMs: t - 2 * DAY, output: 45_000, apiMin: 30, cost: 2.4, ctxPct: 21 }),
+    // web-app → 냥냥봇 Lv.10 어른
+    snapshot({ id: "mock-d1", project: "web-app", model: "Opus", atMs: t - 5 * HOUR, output: 120_000, apiMin: 60, cost: 9.8, ctxPct: 44 }),
+    // neon-garden → 공룡봇 ✨RARE Lv.16 황금킹
+    snapshot({ id: "mock-e1", project: "neon-garden", model: "Opus", atMs: t - 1 * DAY, output: 1_200_000, apiMin: 150, cost: 84, ctxPct: 61 }),
+    snapshot({ id: "mock-e2", project: "neon-garden", model: "Sonnet", atMs: t - 4 * DAY, output: 720_000, apiMin: 120, cost: 41, ctxPct: 37 }),
+    // night-shift → 꽥꽥봇 Lv.20 👑MAX (한 달 갈아넣은 프로젝트)
+    snapshot({ id: "mock-f1", project: "night-shift", model: "Opus", atMs: t - 20 * HOUR, output: 4_800_000, apiMin: 280, cost: 320, ctxPct: 72 }),
+    snapshot({ id: "mock-f2", project: "night-shift", model: "Opus", atMs: t - 3 * DAY, output: 4_200_000, apiMin: 300, cost: 288, ctxPct: 68 }),
+    snapshot({ id: "mock-f3", project: "night-shift", model: "Sonnet", atMs: t - 6 * DAY, output: 2_600_000, apiMin: 240, cost: 96, ctxPct: 55 }),
   ];
 }

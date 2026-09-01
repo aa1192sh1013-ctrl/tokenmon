@@ -49,7 +49,7 @@ export function TokenmonPanel({ state }: { state: TokenmonState }) {
       </div>
 
       <div className="tm-roster-head">
-        <h3>세션 캐릭터</h3>
+        <h3>프로젝트 캐릭터</h3>
         <span>
           {state.pets.length}마리 · 깨어 있음 {state.activeSessionCount}마리 ·{" "}
           <Link className="tm-open-link" href="/gallery">
@@ -58,15 +58,15 @@ export function TokenmonPanel({ state }: { state: TokenmonState }) {
         </span>
       </div>
       {state.pets.length === 0 ? (
-        <div className="state">아직 부화한 캐릭터가 없어요. Claude Code 세션을 열면 알이 생깁니다.</div>
+        <div className="state">아직 부화한 캐릭터가 없어요. Claude Code로 아무 프로젝트나 작업하면 알이 생깁니다.</div>
       ) : (
         <div className="tm-roster">
           {state.pets.slice(0, MAX_PETS).map((pet) => (
-            <TokenmonPetCard key={pet.session.id} pet={pet} />
+            <TokenmonPetCard key={pet.projectName} pet={pet} />
           ))}
         </div>
       )}
-      {restingCount > 0 && <p className="tm-roster-more">지난 세션 캐릭터 {restingCount}마리는 더 깊이 잠들어 있어요.</p>}
+      {restingCount > 0 && <p className="tm-roster-more">쉬고 있는 캐릭터 {restingCount}마리는 접혀 있어요.</p>}
 
       {!state.live && (
         <p className="tm-note">

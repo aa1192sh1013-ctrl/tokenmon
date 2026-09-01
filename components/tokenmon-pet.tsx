@@ -373,7 +373,6 @@ function gridFor(species: TokenmonSpecies, stage: TokenmonStage, stageProgressPc
 }
 
 const STAGE_LABEL: Record<TokenmonStage, string> = { egg: "알", baby: "아기", pet: "어른", dragon: "황금킹" };
-const STAGE_LEVEL: Record<TokenmonStage, number> = { egg: 1, baby: 2, pet: 3, dragon: 4 };
 
 const SAY_LINES: Record<TokenmonMood, string[]> = {
   happy: ["바이브 코딩 가보자고!", "토큰 냠냠, 순항 중"],
@@ -451,7 +450,7 @@ function SpriteSvg({
 export function TokenmonPetCard({ pet }: { pet: TokenmonPet }) {
   const [blinking, setBlinking] = useState(false);
   const [sayIndex, setSayIndex] = useState(0);
-  const { session, species, stage, mood } = pet;
+  const { projectName, species, stage, mood } = pet;
 
   useEffect(() => {
     if (mood === "sleeping") return;
@@ -478,13 +477,13 @@ export function TokenmonPetCard({ pet }: { pet: TokenmonPet }) {
   const lines = SAY_LINES[mood];
   const line = lines[sayIndex % lines.length];
   const say = !pet.active
-    ? "쿨쿨… (지난 세션)"
+    ? "쿨쿨…"
     : stage === "egg"
       ? "…(알 속에서 꼬물꼬물)"
       : mood === "happy" || mood === "content"
         ? `${info.cry} ${line}`
         : line;
-  const label = `${info.label} — ${STAGE_LABEL[stage]}, ${session.projectName} 세션`;
+  const label = `${info.label} — Lv.${pet.level} ${STAGE_LABEL[stage]}, ${projectName}`;
 
   return (
     <div className={`tm-pet-card ${pet.active ? "" : "inactive"}`}>
@@ -492,7 +491,7 @@ export function TokenmonPetCard({ pet }: { pet: TokenmonPet }) {
       {info.rare && <span className="tm-rare">✨RARE</span>}
       <div className={`tm-sprite-wrap ${mood === "sleeping" ? "tm-breathe" : "tm-bob"}`}>
         <SpriteSvg
-          grid={gridFor(species, stage, pet.stageProgressPct)}
+          grid={gridFor(species, stage, pet.levelProgressPct)}
           palette={paletteFor(species, stage)}
           eye={eye}
           mood={mood}
@@ -507,21 +506,27 @@ export function TokenmonPetCard({ pet }: { pet: TokenmonPet }) {
         )}
       </div>
       <div className="tm-name">
-        {info.label} <span className="tm-stage">Lv.{STAGE_LEVEL[stage]} {STAGE_LABEL[stage]}</span>
+        {info.label}{" "}
+        <span className="tm-stage">
+          Lv.{pet.level} {STAGE_LABEL[stage]}
+        </span>
+        {pet.maxLevel && <span className="tm-max">👑MAX</span>}
       </div>
-      <p className="tm-card-sub">{session.projectName}</p>
+      <p className="tm-card-sub">
+        {projectName} · 세션 {pet.sessionCount}회
+      </p>
       <div className="tm-xp">
         <div className="tm-xp-track">
-          <div className="tm-xp-fill" style={{ width: `${pet.stageProgressPct}%` }} />
+          <div className="tm-xp-fill" style={{ width: `${pet.levelProgressPct}%` }} />
         </div>
         <p className="tm-xp-label">
-          {pet.nextStageXp === null
-            ? `최종 진화 · XP ${pet.xp.toLocaleString("ko-KR")}`
-            : `XP ${pet.xp.toLocaleString("ko-KR")}/${pet.nextStageXp.toLocaleString("ko-KR")}`}
+          {pet.nextLevelXp === null
+            ? `만렙 · XP ${formatTokenCount(pet.xp)}`
+            : `XP ${formatTokenCount(pet.xp)}/${formatTokenCount(pet.nextLevelXp)}`}
         </p>
       </div>
       <p className="tm-card-stats">
-        출력 {formatTokenCount(session.outputTokens)} · {formatUsd(session.costUsd)}
+        출력 {formatTokenCount(pet.outputTokens)} · {formatUsd(pet.costUsd)}
       </p>
       <p className="tm-say">{say}</p>
     </div>

@@ -4,7 +4,8 @@
 
 Tired of typing `/usage` to check your Claude Code limits? Tokenmon turns your usage into a little creature that lives in a local dashboard:
 
-- **Every session hatches its own character**: each Claude Code session rolls one of **8 animal-robot species** — 5 common (18% each) and 3 rare ✨ — picked deterministically from the session id (the egg's speckles hint at what's inside). It evolves Egg → Baby → Adult → Golden King from that session's actual work. Open windows are awake; closed sessions nap in the roster 💤. Browse them all at `/gallery`.
+- **Every project raises its own character**: each project rolls one of **8 animal-robot species** — 5 common (18% each) and 3 rare ✨ — picked deterministically from the project name (the egg's speckles hint at what's inside). Every Claude Code session in that project feeds it. Projects you're working on right now are awake; the rest nap in the roster 💤. Browse them all at `/gallery`.
+- **Lv.1–20 with a real grind**: maxing a character out (👑MAX, 500k XP) takes about a month of genuinely unhinged daily usage. Casual use gets you there in a year. No shortcuts.
 - **Summary up top**: fatigue gauge = your 5-hour rate limit, life gauge = your weekly limit — both with live reset countdowns — plus per-session token bars and totals.
 - At 70% usage everyone gets sleepy 😪, at 90% exhausted 🥵, at 100% they sleep 😴 until the window resets.
 - **Real numbers, not just percentages**: per-session input/output tokens and API-equivalent cost.
@@ -57,16 +58,19 @@ Claude Code pipes session JSON into whatever command is configured as your [stat
 | 5h / weekly usage % and reset times | Absolute subscription limits (Anthropic doesn't publish them) |
 | API-equivalent cost, context usage | |
 
-## Evolution (per session)
+## Leveling (per project)
 
-| Stage | XP | Roughly |
-|---|---|---|
-| 🥚 Egg | 0 | a quick question or two (it cracks as it gets close to hatching) |
-| 🐣 Baby | 120 | a few minutes of real work |
-| 🤖 Adult | 1,200 | a solid working session |
-| 👑 Golden King | 5,000 | a monster all-day session — gold trim + sparkles |
+XP = output tokens ÷ 25 + API minutes × 6 + changed lines × 2, summed over every session in the project — weighted toward *actual work*, not leaving a window open.
 
-Session XP = output tokens ÷ 25 + API minutes × 6 + changed lines × 2 — weighted toward *actual work done in the session*, not leaving a window open.
+| Level | Form | Cumulative XP | Roughly |
+|---|---|---|---|
+| Lv.1 | 🥚 Egg | 0 | a quick question or two (cracks near hatching) |
+| Lv.2–7 | 🐣 Baby | 120 → 1,200 | first real day on the project |
+| Lv.8–14 | 🤖 Adult | 1,900 → 30,000 | days-to-weeks of steady work |
+| Lv.15–19 | 👑 Golden King | 48,000 → 300,000 | weeks of serious grinding — gold trim + sparkles |
+| **Lv.20** | 👑 **MAX** | **500,000** | ~a month of unhinged daily token burning |
+
+Each level costs ~1.6× the previous one (120, 190, 300, 480, 760, 1.2k, … 300k, 500k). Calibrated against real `ccusage` data from a certifiable daily heavy user.
 
 ## Species gacha
 
@@ -81,7 +85,7 @@ Session XP = output tokens ÷ 25 + API minutes × 6 + changed lines × 2 — wei
 | 유니뿅 ✨ | unicorn bot, golden horn | **3%** |
 | 용용봇 ✨ | winged dragonet bot | **2%** |
 
-The roll is a hash of the session id — deterministic, no rerolls, no crying.
+The roll is a hash of the project name — deterministic, no rerolls, no crying. (Renaming the folder to reroll is between you and your conscience.)
 
 ## Uninstall
 
