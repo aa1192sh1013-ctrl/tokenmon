@@ -45,7 +45,7 @@ function readIgnoreProjectNames(): string[] {
   }
 }
 
-export async function TokenmonSection() {
+export async function TokenmonSection({ langOverride }: { langOverride?: string } = {}) {
   const persisted = readSnapshots();
   // statusline 수집기가 담당 중인 세션은 테일링에서 제외 (statusline 쪽 데이터가 더 풍부)
   const statuslineIds = new Set(
@@ -91,5 +91,5 @@ export async function TokenmonSection() {
       if (estimate) state.fiveHour = { ...estimate, fresh: true, estimated: true };
     }
   }
-  return <TokenmonPanel state={state} lang={await detectLang()} />;
+  return <TokenmonPanel state={state} lang={await detectLang(langOverride)} />;
 }

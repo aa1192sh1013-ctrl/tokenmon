@@ -10,8 +10,8 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function GalleryPage() {
-  const lang = await detectLang();
+export default async function GalleryPage({ searchParams }: { searchParams: Promise<{ lang?: string }> }) {
+  const lang = await detectLang((await searchParams).lang);
   return (
     <main className="tokenmon-standalone">
       <div className="tokenmon-standalone-inner">
