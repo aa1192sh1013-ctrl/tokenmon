@@ -76,7 +76,7 @@ code { padding: 1px 5px; border-radius: 4px; background: var(--soft); font-size:
 .tm-roster-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 0 10px; padding-top: 14px; border-top: 1px solid var(--line); }
 .tm-roster-head h3 { margin: 0; font-size: 13px; }
 .tm-roster-head span { color: var(--muted); font-size: 11px; }
-.tm-roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 10px; }
+.tm-roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(192px, 1fr)); gap: 10px; }
 .tm-pet-card { position: relative; padding: 12px 10px 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); text-align: center; }
 .tm-pet-card.inactive { opacity: .68; }
 .tm-pet-card .tm-name { margin-top: 5px; font-size: 13px; }
