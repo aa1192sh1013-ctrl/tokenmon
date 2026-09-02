@@ -26,11 +26,14 @@ function Meter({
   bowlNoun,
   window: win,
   nowMs,
+  eating,
 }: {
   title: string;
   bowlNoun: string;
   window: TokenmonRateWindow | null;
   nowMs: number | null;
+  /** 최근 활동이 있음 — 새 창을 이미 먹기 시작한 상태. */
+  eating: boolean;
 }) {
   if (!win) {
     return (
@@ -52,12 +55,16 @@ function Meter({
       <div className="tm-meter">
         <div className="tm-meter-head">
           <span className="tm-meter-title">🍚 {title}</span>
-          <span className="tm-meter-val">0% 먹음</span>
+          <span className="tm-meter-val">{eating ? "새 그릇 먹는 중" : "0% 먹음"}</span>
         </div>
         <div className="tm-meter-track good">
-          <div className="tm-meter-fill good" style={{ width: 0 }} />
+          <div className="tm-meter-fill good" style={{ width: eating ? "6%" : 0 }} />
         </div>
-        <p className="tm-meter-sub">새 {bowlNoun} 준비 완료 — 첫 입을 먹으면 타이머가 시작돼요</p>
+        <p className="tm-meter-sub">
+          {eating
+            ? `새 ${bowlNoun} 먹는 중 — 게이지는 상태줄 켜진 Claude 창이 응답을 받으면 갱신돼요`
+            : `새 ${bowlNoun} 준비 완료 — 첫 입을 먹으면 타이머가 시작돼요`}
+        </p>
       </div>
     );
   }
@@ -94,9 +101,11 @@ function coachLine(
   five: TokenmonRateWindow | null,
   streakDays: number,
   fedToday: boolean,
+  eating: boolean,
 ): string | null {
   if (!five) return null;
-  if (five.fresh) return "🍚 새 밥그릇이 나왔어요 — 지금 먹는 게 제일 이득";
+  if (five.fresh)
+    return eating ? "🍚 새 밥그릇 먹는 중 — 게이지는 곧 따라와요" : "🍚 새 밥그릇이 나왔어요 — 지금 먹는 게 제일 이득";
   if (five.usedPct >= 99.5) return "😴 완식! 소화 중 — 새 밥그릇을 기다려요";
   if (!fedToday && streakDays > 0) return `🔥 연속 ${streakDays}일이 오늘 끊길 위기 — 한 입만 먹여주세요`;
   const remainPct = Math.round(100 - five.usedPct);
@@ -135,12 +144,13 @@ export function TokenmonMeters({
 
   const sinceMs = lastActivityAt !== null && nowMs !== null ? Math.max(0, nowMs - Date.parse(lastActivityAt)) : null;
   const lastSeen = sinceMs === null ? null : sinceMs < 60_000 ? "마지막 활동 방금 전" : `마지막 활동 ${formatDurationKo(sinceMs)} 전`;
-  const coach = coachLine(fiveHour, streakDays, fedToday);
+  const eating = sinceMs !== null && sinceMs < 30 * 60_000;
+  const coach = coachLine(fiveHour, streakDays, fedToday, eating);
 
   return (
     <div className="tm-status-col">
-      <Meter title="이번 밥그릇 · 5시간" bowlNoun="밥그릇" window={fiveHour} nowMs={nowMs} />
-      <Meter title="이번 주 밥통 · 주간" bowlNoun="밥통" window={sevenDay} nowMs={nowMs} />
+      <Meter title="이번 밥그릇 · 5시간" bowlNoun="밥그릇" window={fiveHour} nowMs={nowMs} eating={eating} />
+      <Meter title="이번 주 밥통 · 주간" bowlNoun="밥통" window={sevenDay} nowMs={nowMs} eating={eating} />
       <div className="tm-stats">
         <div className="tm-stat">
           <span className="metric-label">모은 토큰 (출력)</span>
