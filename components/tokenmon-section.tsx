@@ -3,6 +3,7 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { mockTokenmonSnapshots } from "@/lib/mock";
 import { deriveTokenmonState, parseTokenmonSnapshot, type TokenmonSnapshot } from "@/lib/tokenmon";
+import { detectLang } from "./tokenmon-lang";
 import { TokenmonPanel } from "./tokenmon-panel";
 import { readActiveTranscriptSnapshots, sanitizeSessionId } from "./transcript-tail";
 import { fetchApiUsage } from "./usage-api";
@@ -90,5 +91,5 @@ export async function TokenmonSection() {
       if (estimate) state.fiveHour = { ...estimate, fresh: true, estimated: true };
     }
   }
-  return <TokenmonPanel state={state} />;
+  return <TokenmonPanel state={state} lang={await detectLang()} />;
 }

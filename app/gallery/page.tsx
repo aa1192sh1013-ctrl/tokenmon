@@ -1,19 +1,23 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { TokenmonGallery } from "@/components/tokenmon-gallery";
+import { detectLang } from "@/components/tokenmon-lang";
 
 export const metadata: Metadata = {
-  title: "Tokenmon 도감",
-  description: "모든 종족과 성장 단계 미리보기",
+  title: "Tokenmon Dex",
+  description: "Every species and growth stage at a glance",
 };
 
-export default function GalleryPage() {
+export const dynamic = "force-dynamic";
+
+export default async function GalleryPage() {
+  const lang = await detectLang();
   return (
     <main className="tokenmon-standalone">
       <div className="tokenmon-standalone-inner">
-        <TokenmonGallery />
+        <TokenmonGallery lang={lang} />
         <p className="tm-standalone-foot">
-          <Link href="/">← 내 토큰몬으로</Link>
+          <Link href="/">{lang === "ko" ? "← 내 토큰몬으로" : "← back to my Tokenmon"}</Link>
         </p>
       </div>
     </main>

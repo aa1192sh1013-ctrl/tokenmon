@@ -79,7 +79,7 @@ async function aggregateFile(file, agg) {
 
 async function main() {
   if (!fs.existsSync(PROJECTS_DIR)) {
-    console.error("✗ ~/.claude/projects 가 없습니다 — 백필할 기록이 없어요.");
+    console.error("x ~/.claude/projects not found - nothing to backfill.");
     process.exit(1);
   }
   fs.mkdirSync(SESSIONS_DIR, { recursive: true });
@@ -95,7 +95,7 @@ async function main() {
   let grandOutput = 0;
   let grandSessions = 0;
   let grandSkipped = 0;
-  console.log(`백필 시작 — 프로젝트 폴더 ${projectDirs.length}개\n`);
+  console.log(`Backfill started - ${projectDirs.length} project folders\n`);
 
   for (const entry of projectDirs) {
     const dirPath = path.join(PROJECTS_DIR, entry.name);
@@ -121,7 +121,7 @@ async function main() {
       }
     }
     if (agg.sessions === 0 || agg.output === 0) {
-      if (agg.skipped) console.log(`· ${entry.name} — 새로 집계할 세션 없음 (라이브 수집 ${agg.skipped}개 제외)`);
+      if (agg.skipped) console.log(`- ${entry.name}: no new sessions (${agg.skipped} live-collected skipped)`);
       continue;
     }
 
@@ -131,7 +131,7 @@ async function main() {
       payload: {
         session_id: "backfill-" + entry.name,
         workspace: { project_dir: projectDir, current_dir: projectDir },
-        model: { id: "backfill", display_name: "지난 기록" },
+        model: { id: "backfill", display_name: "history" },
         cost: { total_cost_usd: null, total_duration_ms: 0, total_api_duration_ms: 0, total_lines_added: 0, total_lines_removed: 0 },
         context_window: { total_input_tokens: agg.input + agg.cacheCreate + agg.cacheRead, total_output_tokens: agg.output },
         backfill: { sessions: agg.sessions, first_at: Number.isFinite(agg.firstMs) ? new Date(agg.firstMs).toISOString() : null },
@@ -141,18 +141,18 @@ async function main() {
 
     const totalTokens = agg.input + agg.cacheCreate + agg.cacheRead + agg.output;
     const xp = totalTokens / 1e6; // 1 XP = 총 토큰(캐시 포함) 100만
-    const skippedNote = agg.skipped ? ` · 라이브 수집 ${agg.skipped}개 제외` : "";
-    console.log(`✓ ${basename(projectDir)} — 세션 ${agg.sessions}개, 총 ${fmt(totalTokens)} 토큰 → 약 ${xp.toFixed(1)} XP (Lv.${levelOf(xp)})${skippedNote}`);
+    const skippedNote = agg.skipped ? ` (skipped ${agg.skipped} live-collected)` : "";
+    console.log(`+ ${basename(projectDir)}: ${agg.sessions} sessions, ${fmt(totalTokens)} total tokens -> ~${xp.toFixed(1)} XP (Lv.${levelOf(xp)})${skippedNote}`);
     grandOutput += agg.output;
     grandSessions += agg.sessions;
     grandSkipped += agg.skipped;
   }
 
-  console.log(`\n완료 — 세션 ${grandSessions}개에서 출력 ${fmt(grandOutput)} 토큰을 반영했습니다 (라이브 수집 ${grandSkipped}개 제외).`);
-  console.log("대시보드는 20초 안에 자동 반영됩니다.");
+  console.log(`\nDone - absorbed ${fmt(grandOutput)} output tokens from ${grandSessions} sessions (${grandSkipped} live-collected skipped).`);
+  console.log("The dashboard picks this up automatically within seconds.");
 }
 
 main().catch((error) => {
-  console.error("✗ 백필 실패:", error.message);
+  console.error("x Backfill failed:", error.message);
   process.exit(1);
 });

@@ -232,7 +232,7 @@ function toSession(snapshot: TokenmonSnapshot): TokenmonSession {
   return {
     id: payload.session_id ?? "unknown",
     projectName:
-      basename(payload.workspace?.project_dir) ?? basename(payload.workspace?.current_dir) ?? basename(payload.cwd) ?? "알 수 없는 프로젝트",
+      basename(payload.workspace?.project_dir) ?? basename(payload.workspace?.current_dir) ?? basename(payload.cwd) ?? "unknown-project",
     model: payload.model?.display_name ?? payload.model?.id ?? "Claude",
     savedAt: snapshot.savedAt,
     inputTokens: num(payload.context_window?.total_input_tokens) ?? 0,
@@ -447,7 +447,10 @@ export function deriveTokenmonState(
   };
 }
 
-/* ---------- 표시용 포맷터 (서버·클라이언트 공통) ---------- */
+/* ---------- 표시 언어 + 포맷터 (서버·클라이언트 공통) ---------- */
+
+/** UI 언어 — 영어 기본, 브라우저가 한국어면 자동으로 한국어. */
+export type TokenmonLang = "en" | "ko";
 
 export function formatTokenCount(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return "0";
@@ -460,26 +463,37 @@ export function formatUsd(value: number | null): string {
   return value === null ? "–" : `$${value.toFixed(2)}`;
 }
 
-const clockFormat = new Intl.DateTimeFormat("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false });
+const clockFormats: Record<TokenmonLang, Intl.DateTimeFormat> = {
+  en: new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
+  ko: new Intl.DateTimeFormat("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false }),
+};
 
-export function formatClock(epochMs: number): string {
-  return clockFormat.format(new Date(epochMs));
+export function formatClock(epochMs: number, lang: TokenmonLang = "en"): string {
+  return clockFormats[lang].format(new Date(epochMs));
 }
 
-const dayTimeFormat = new Intl.DateTimeFormat("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+const dayTimeFormats: Record<TokenmonLang, Intl.DateTimeFormat> = {
+  en: new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }),
+  ko: new Intl.DateTimeFormat("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }),
+};
 
-export function formatDayTime(iso: string): string {
-  return dayTimeFormat.format(new Date(iso));
+export function formatDayTime(iso: string, lang: TokenmonLang = "en"): string {
+  return dayTimeFormats[lang].format(new Date(iso));
 }
 
-/** "1시간 42분", "3일 4시간" 같은 남은 시간 문구. 1분 미만은 "곧". */
-export function formatDurationKo(ms: number): string {
-  if (ms < 60_000) return "곧";
+/** "1h 42m" / "1시간 42분" 같은 남은 시간 문구. 1분 미만은 "soon"/"곧". */
+export function formatDuration(ms: number, lang: TokenmonLang = "en"): string {
+  if (ms < 60_000) return lang === "ko" ? "곧" : "soon";
   const minutes = Math.floor(ms / 60_000);
   const days = Math.floor(minutes / 1440);
   const hours = Math.floor((minutes % 1440) / 60);
   const rest = minutes % 60;
-  if (days > 0) return hours > 0 ? `${days}일 ${hours}시간` : `${days}일`;
-  if (hours > 0) return rest > 0 ? `${hours}시간 ${rest}분` : `${hours}시간`;
-  return `${rest}분`;
+  if (lang === "ko") {
+    if (days > 0) return hours > 0 ? `${days}일 ${hours}시간` : `${days}일`;
+    if (hours > 0) return rest > 0 ? `${hours}시간 ${rest}분` : `${hours}시간`;
+    return `${rest}분`;
+  }
+  if (days > 0) return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+  if (hours > 0) return rest > 0 ? `${hours}h ${rest}m` : `${hours}h`;
+  return `${rest}m`;
 }

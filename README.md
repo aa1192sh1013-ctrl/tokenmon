@@ -8,6 +8,7 @@ Tired of typing `/usage` to check your Claude Code limits? Tokenmon turns your u
 - **Lv.1–20, no stage classes — just continuous growth**: every species has 20 unique illustrated evolution stages, from a wide-eyed Lv.1 baby bot to a fully-armored Lv.20 war machine (👑MAX at 5,700 XP ≈ 5.7B total tokens — months of unhinged daily usage). The sprite gets bigger and meaner every single level.
 - **Don't waste what you already paid for**: the 5-hour bowl and weekly bucket gauges show how much of your subscription capacity you've actually eaten — whatever's left at reset **evaporates** 💸. The panel counts down to the next evaporation and reports how much you wasted last window.
 - **Neglect has consequences**: leave a project untouched for 3+ days and its character starts starving 🥀 — XP withers ~3% a day and levels can drop — until one session restores it in full. Skip a day and your streak 🔥 is gone.
+- **English & Korean**: the UI is English by default and switches to Korean automatically when your browser prefers it (force either with `{ "lang": "ko" | "en" }` in `~/.claude/tokenmon/config.json`).
 - **Real numbers, not just percentages**: per-session output tokens up front; input (cache included) and cost in the table.
 - A **terminal status line** too: `😊 Tokenmon │ Opus │ 5h ▰▰▱▱ 42% │ wk 22% │ tok 43.9k │ ctx 4% │ $0.44`
 
@@ -101,7 +102,7 @@ Timestamped backups of `settings.json` are left in `~/.claude/`.
 
 ## 한국어
 
-Claude Code 사용량으로 키우는 토큰 다마고치예요. 프로젝트 폴더마다 메카 동물 캐릭터가 한 마리씩 부화해서(60종 × 12색 랜덤), 총 토큰 100만 개당 1 XP로 Lv.20까지 자랍니다. 레벨마다 진화 일러스트가 통째로 바뀌고, 3일 넘게 방치하면 굶어서 XP가 마르고, 5시간 밥그릇을 안 비우면 그만큼 증발해요. 전부 로컬에서만 돌고 대화 내용은 절대 수집하지 않아요. `npm run setup` 한 번이면 연결 끝!
+Claude Code 사용량으로 키우는 토큰 다마고치예요. 프로젝트 폴더마다 메카 동물 캐릭터가 한 마리씩 부화해서(60종 × 12색 랜덤), 총 토큰 100만 개당 1 XP로 Lv.20까지 자랍니다. 레벨마다 진화 일러스트가 통째로 바뀌고, 3일 넘게 방치하면 굶어서 XP가 마르고, 5시간 밥그릇을 안 비우면 그만큼 증발해요. 전부 로컬에서만 돌고 대화 내용은 절대 수집하지 않아요. UI는 브라우저가 한국어면 자동으로 한국어로 나옵니다. `npm run setup` 한 번이면 연결 끝!
 
 ## License
 

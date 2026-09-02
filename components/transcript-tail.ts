@@ -92,7 +92,7 @@ function toSnapshot(sessionId: string, state: TailState): TokenmonSnapshot {
     payload: {
       session_id: `transcript-${sessionId}`,
       workspace: state.cwd ? { project_dir: state.cwd, current_dir: state.cwd } : undefined,
-      model: { id: "transcript", display_name: "대화 로그" },
+      model: { id: "transcript", display_name: "transcript" },
       cost: { total_cost_usd: null, total_duration_ms: null, total_api_duration_ms: 0, total_lines_added: 0, total_lines_removed: 0 },
       context_window: {
         total_input_tokens: state.input + state.cacheCreate + state.cacheRead,
