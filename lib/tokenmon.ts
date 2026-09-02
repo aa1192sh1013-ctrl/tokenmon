@@ -151,6 +151,8 @@ export interface TokenmonPet {
   hungerPct: number;
   sessionCount: number;
   outputTokens: number;
+  /** 라이브 세션 누적 총 토큰(기준선 차감 전) — 최초 감지 기준선 등록용. */
+  totalTokens: number;
   costUsd: number;
   lastSeenAt: string;
 }
@@ -338,6 +340,8 @@ export function deriveTokenmonState(
     ignoreProjectDirPrefixes?: string[];
     /** 프로젝트 이름 와일드카드 제외 (예: "_*", "*-scratch") — 사용자 설정용. */
     ignoreProjectNames?: string[];
+    /** 프로젝트별 XP 0점 기준선(총 토큰) — 최초 감지 순간의 누적치. 그 이후 증가분만 성장에 들어간다. */
+    baselines?: Record<string, number>;
   },
 ): TokenmonState {
   const nowMs = (options.now ?? new Date()).getTime();
@@ -375,7 +379,9 @@ export function deriveTokenmonState(
 
   const pets: TokenmonPet[] = [...byProject.entries()]
     .map(([projectName, group]) => {
-      const rawXp = group.reduce((sum, session) => sum + sessionXp(session), 0);
+      const totalTokens = group.reduce((sum, session) => sum + session.inputTokens + session.outputTokens, 0);
+      // 최초 감지 순간의 누적치가 0점 — 캐릭터는 그 이후 증가분만 먹고 자란다.
+      const rawXp = Math.max(0, totalTokens - (options.baselines?.[projectName] ?? 0)) / 1_000_000;
       const liveGroup = group.filter((session) => !isBackfillSession(session.id));
       const lastSeenMs = Math.max(...group.map((session) => Date.parse(session.savedAt)));
       const active = liveGroup.some((session) => nowMs - Date.parse(session.savedAt) <= ACTIVE_WINDOW_MS);
@@ -405,6 +411,7 @@ export function deriveTokenmonState(
         hungerPct,
         sessionCount: liveGroup.length + group.reduce((sum, session) => sum + session.historySessions, 0),
         outputTokens: group.reduce((sum, session) => sum + session.outputTokens, 0),
+        totalTokens,
         costUsd: Number(group.reduce((sum, session) => sum + (session.costUsd ?? 0), 0).toFixed(2)),
         lastSeenAt: new Date(lastSeenMs).toISOString(),
       };

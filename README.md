@@ -34,7 +34,7 @@ Then open a new Claude Code session anywhere and do anything — your Tokenmon h
 
 **Already a Claude Code user?** The stats board fills itself in: on first launch the dashboard automatically backfills your past usage from local `~/.claude/projects` transcripts, aggregating **numbers only** (tokens, timestamps — conversation content is never stored). Your lifetime totals and activity show up immediately.
 
-Your **critters** are a different story, on purpose: history doesn't level them. Every project's character starts at Lv.1 the moment Tokenmon first sees it live, and grows only from there — everyone raises theirs from scratch. (Re-run the history sweep any time with `npm run backfill`; it never double-counts live sessions.)
+Your **critters** are a different story, on purpose: history doesn't level them. The moment Tokenmon first sees a project, that instant's usage becomes the character's zero point — it hatches at Lv.1 and grows only from tokens burned after that. Everyone raises theirs from scratch. (Baselines live in `~/.claude/tokenmon/projects.json`; delete it for a full ranch reset. Re-run the history sweep any time with `npm run backfill`.)
 
 **Keeping the ranch tidy**: sessions started in your home directory, Desktop/Downloads/Documents, or anywhere under the OS temp folder never hatch characters (their usage still counts in the totals). To exclude more by name, create `~/.claude/tokenmon/config.json`:
 

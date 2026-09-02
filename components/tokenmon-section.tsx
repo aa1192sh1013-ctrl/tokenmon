@@ -4,6 +4,7 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { mockTokenmonSnapshots } from "@/lib/mock";
 import { deriveTokenmonState, parseTokenmonSnapshot, type TokenmonSnapshot } from "@/lib/tokenmon";
+import { syncProjectRegistry } from "./pet-registry";
 import { detectLang } from "./tokenmon-lang";
 import { TokenmonPanel } from "./tokenmon-panel";
 import { readActiveTranscriptSnapshots, sanitizeSessionId } from "./transcript-tail";
@@ -96,12 +97,19 @@ export async function TokenmonSection({ langOverride }: { langOverride?: string 
     ...tailed,
   ];
   const live = real.length > 0;
-  const state = deriveTokenmonState(live ? real : mockTokenmonSnapshots(), {
+  const deriveOptions = {
     live,
     ignoreProjectDirs,
     ignoreProjectDirPrefixes,
     ignoreProjectNames: readIgnoreProjectNames(),
-  });
+  };
+  // 1차 파생으로 프로젝트별 현재 누적치를 얻고, 처음 보는 프로젝트는 그 값을
+  // 0점 기준선으로 등록한 뒤(최초 손댄 순간 = Lv.1 시작), 기준선을 반영해 다시 파생한다.
+  let state = deriveTokenmonState(live ? real : mockTokenmonSnapshots(), deriveOptions);
+  if (live) {
+    const baselines = syncProjectRegistry(state.pets);
+    state = deriveTokenmonState(real, { ...deriveOptions, baselines });
+  }
 
   // 밥그릇 게이지 — 1순위: 사용량 API 직접 조회(데스크탑 앱과 같은 값),
   // 폴백: statusline 관측, 최후: 대화 로그 기반 추정.

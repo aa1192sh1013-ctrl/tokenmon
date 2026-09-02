@@ -69,6 +69,7 @@ function samplePet(species: TokenmonSpecies, level: number, color: TokenmonColor
     hungerPct: 0,
     sessionCount: level * 3,
     outputTokens: xp * 2_600,
+    totalTokens: xp * 1_000_000,
     costUsd: Number((xp * 0.02).toFixed(2)),
     lastSeenAt: new Date(0).toISOString(),
   };
