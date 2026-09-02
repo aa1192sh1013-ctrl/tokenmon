@@ -123,6 +123,11 @@ export interface TokenmonRateWindow {
   usedPct: number;
   /** epoch 밀리초. 없으면 null. */
   resetsAtMs: number | null;
+  /**
+   * 직전 창이 만료됐는데 새 창 관측값이 아직 없음 = 새 밥그릇.
+   * (5시간·주간 창은 첫 사용 시점에 시작되므로 리셋 직후엔 타이머가 없다.)
+   */
+  fresh?: boolean;
 }
 
 /** 프로젝트가 키우는 캐릭터 — 그 프로젝트의 모든 세션이 먹이를 준다. 종족·색은 프로젝트명 해시로 고정. */
@@ -286,8 +291,12 @@ function bestRateWindow(
   return best;
 }
 
-/** 이미 리셋돼 버린 직전 창에서 마지막으로 관측된 사용률 — "지난 밥그릇 낭비" 계산용. */
-function lastExpiredWindowUsedPct(sorted: TokenmonSnapshot[], key: "five_hour" | "seven_day", nowMs: number): number | null {
+/** 이미 리셋돼 버린 직전 창의 마지막 관측값 — "지난 밥그릇 낭비"와 새 밥그릇 판정에 쓴다. */
+function lastExpiredWindow(
+  sorted: TokenmonSnapshot[],
+  key: "five_hour" | "seven_day",
+  nowMs: number,
+): { usedPct: number; resetsAtMs: number } | null {
   let best: { usedPct: number; resetsAtMs: number } | null = null;
   for (const snapshot of sorted) {
     const window = snapshot.payload.rate_limits?.[key];
@@ -300,7 +309,7 @@ function lastExpiredWindowUsedPct(sorted: TokenmonSnapshot[], key: "five_hour" |
     if (!best || resetsAtMs > best.resetsAtMs || (resetsAtMs === best.resetsAtMs && usedPct > best.usedPct))
       best = { usedPct, resetsAtMs };
   }
-  return best ? best.usedPct : null;
+  return best;
 }
 
 /** 세션 XP — 총 토큰(입력·캐시 포함 + 출력) 100만 개당 1 XP. */
@@ -334,7 +343,13 @@ export function deriveTokenmonState(
   const allSessions = sorted.map(toSession);
   const liveSessions = allSessions.filter((session) => !isBackfillSession(session.id));
 
-  const fiveHour = bestRateWindow(sorted, "five_hour", nowMs);
+  // 유효한 창이 없어도 직전 창의 만료를 관측했다면 "새 밥그릇(0%)"으로 초기화해서 보여준다.
+  const expiredFive = lastExpiredWindow(sorted, "five_hour", nowMs);
+  const expiredSeven = lastExpiredWindow(sorted, "seven_day", nowMs);
+  const fiveHour =
+    bestRateWindow(sorted, "five_hour", nowMs) ?? (expiredFive ? { usedPct: 0, resetsAtMs: null, fresh: true } : null);
+  const sevenDay =
+    bestRateWindow(sorted, "seven_day", nowMs) ?? (expiredSeven ? { usedPct: 0, resetsAtMs: null, fresh: true } : null);
 
   const ignoredDirs = new Set((options.ignoreProjectDirs ?? []).map(normalizeDir));
   const ignoredPrefixes = (options.ignoreProjectDirPrefixes ?? []).map(normalizeDir);
@@ -417,11 +432,8 @@ export function deriveTokenmonState(
     pets,
     activeSessionCount,
     fiveHour,
-    sevenDay: bestRateWindow(sorted, "seven_day", nowMs),
-    wastedFiveHourPct: (() => {
-      const used = lastExpiredWindowUsedPct(sorted, "five_hour", nowMs);
-      return used === null ? null : Math.max(0, Math.round(100 - used));
-    })(),
+    sevenDay,
+    wastedFiveHourPct: expiredFive === null ? null : Math.max(0, Math.round(100 - expiredFive.usedPct)),
     streakDays,
     fedToday,
     starvingCount: pets.filter((pet) => pet.mood === "starving").length,
