@@ -360,6 +360,9 @@ export function deriveTokenmonState(
   const ignoredNames = options.ignoreProjectNames ?? [];
   const byProject = new Map<string, TokenmonSession[]>();
   for (const session of allSessions) {
+    // 캐릭터는 라이브로 감지된 시점부터 Lv.1로 시작한다 — 설치 전 기록(백필)은
+    // 현황판 합계에만 들어가고, 성장에는 넣지 않는다.
+    if (isBackfillSession(session.id)) continue;
     // 잡폴더 세션은 캐릭터를 만들지 않는다 (사용량 집계에는 포함)
     const dir = normalizeDir(session.projectDir);
     if (ignoredDirs.has(dir)) continue;

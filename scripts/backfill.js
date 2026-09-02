@@ -108,14 +108,51 @@ async function main() {
     const agg = { input: 0, cacheCreate: 0, cacheRead: 0, output: 0, sessions: 0, skipped: 0, firstMs: Infinity, lastMs: 0, cwd: null };
     for (const file of files) {
       const sessionId = file.slice(0, -6);
-      // statusline 수집분과 실시간 테일링분은 건너뛴다 (중복 방지)
-      if (liveIds.has(sanitize(sessionId)) || liveIds.has(sanitize(`transcript-${sessionId}`))) {
+      const filePath = path.join(dirPath, file);
+      // statusline 수집분은 항상 건너뛴다 (Claude가 준 정확한 누적치가 이미 있다)
+      if (liveIds.has(sanitize(sessionId))) {
+        agg.skipped += 1;
+        continue;
+      }
+      // 테일링 스냅샷: 살아 있는 세션은 건너뛰고, 1시간 이상 조용한 세션은
+      // 대시보드가 못 본 꼬리가 있을 수 있으니 전체 재집계값으로 "확정"해 둔다.
+      // (스냅샷은 캐릭터 성장 원장이라 지우지 않는다 — 값만 정확하게.)
+      if (liveIds.has(sanitize(`transcript-${sessionId}`))) {
+        let mtimeMs = 0;
+        try {
+          mtimeMs = fs.statSync(filePath).mtimeMs;
+        } catch {}
+        if (Date.now() - mtimeMs >= 60 * 60_000) {
+          const solo = { input: 0, cacheCreate: 0, cacheRead: 0, output: 0, firstMs: Infinity, lastMs: 0, cwd: null };
+          try {
+            await aggregateFile(filePath, solo);
+            const tailPath = path.join(SESSIONS_DIR, sanitize(`transcript-${sessionId}`) + ".json");
+            const body = {
+              savedAt: new Date(solo.lastMs || mtimeMs).toISOString(),
+              payload: {
+                session_id: `transcript-${sessionId}`,
+                workspace: solo.cwd ? { project_dir: solo.cwd, current_dir: solo.cwd } : undefined,
+                model: { id: "transcript", display_name: "transcript" },
+                cost: { total_cost_usd: null, total_duration_ms: null, total_api_duration_ms: 0, total_lines_added: 0, total_lines_removed: 0 },
+                context_window: {
+                  total_input_tokens: solo.input + solo.cacheCreate + solo.cacheRead,
+                  total_output_tokens: solo.output,
+                  context_window_size: null,
+                  used_percentage: null,
+                },
+              },
+            };
+            fs.writeFileSync(tailPath, JSON.stringify(body));
+          } catch {
+            /* 확정 실패 시 기존 스냅샷 유지 */
+          }
+        }
         agg.skipped += 1;
         continue;
       }
       agg.sessions += 1;
       try {
-        await aggregateFile(path.join(dirPath, file), agg);
+        await aggregateFile(filePath, agg);
       } catch {
         /* 깨진 파일은 건너뛴다 */
       }

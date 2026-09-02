@@ -32,13 +32,9 @@ npm run dev       # dashboard at http://localhost:4242
 
 Then open a new Claude Code session anywhere and do anything — your Tokenmon hatches within seconds.
 
-**Already a Claude Code user?** Pull your past months of usage into the ranch:
+**Already a Claude Code user?** The stats board fills itself in: on first launch the dashboard automatically backfills your past usage from local `~/.claude/projects` transcripts, aggregating **numbers only** (tokens, timestamps — conversation content is never stored). Your lifetime totals and activity show up immediately.
 
-```bash
-npm run backfill
-```
-
-It scans your local `~/.claude/projects` transcripts and aggregates **numbers only** (tokens, timestamps — conversation content is never stored) into one history summary per project, so your characters instantly reflect your real track record. Safe to re-run any time: summaries are overwritten and live-collected sessions are never double-counted.
+Your **critters** are a different story, on purpose: history doesn't level them. Every project's character starts at Lv.1 the moment Tokenmon first sees it live, and grows only from there — everyone raises theirs from scratch. (Re-run the history sweep any time with `npm run backfill`; it never double-counts live sessions.)
 
 **Keeping the ranch tidy**: sessions started in your home directory, Desktop/Downloads/Documents, or anywhere under the OS temp folder never hatch characters (their usage still counts in the totals). To exclude more by name, create `~/.claude/tokenmon/config.json`:
 
@@ -77,7 +73,7 @@ Claude Code pipes session JSON into whatever command is configured as your [stat
 
 ## Leveling (per project)
 
-**1 XP = 1,000,000 total tokens** (input + cache + output — the same unit as `ccusage`'s Total Tokens column), summed over every session in the project. The curve is gentle (~1.2× per level: 37, 44, 53, 64, … 814, ~1,000) and tops out at **5,700 XP ≈ 5.7B total tokens for Lv.20** — calibrated against real `ccusage` data from a certifiable daily heavy user: months of hard daily grinding on a single project.
+**1 XP = 1,000,000 total tokens** (input + cache + output — the same unit as `ccusage`'s Total Tokens column), summed over the project's sessions **since Tokenmon first saw it live** — pre-install history feeds the stats board, not the critter. The curve is gentle (~1.2× per level: 37, 44, 53, 64, … 814, ~1,000) and tops out at **5,700 XP ≈ 5.7B total tokens for Lv.20** — calibrated against real `ccusage` data from a certifiable daily heavy user: months of hard daily grinding on a single project.
 
 ## Species gacha — 60 to collect × 12 colors
 

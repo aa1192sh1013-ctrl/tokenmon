@@ -1,4 +1,5 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { mockTokenmonSnapshots } from "@/lib/mock";
@@ -10,6 +11,33 @@ import { fetchApiUsage } from "./usage-api";
 import { estimateFreshFiveHour, recordUsage } from "./usage-series";
 
 const sessionsDir = join(homedir(), ".claude", "tokenmon", "sessions");
+const metaFile = join(homedir(), ".claude", "tokenmon", "meta.json");
+
+/**
+ * 첫 실행 자동 백필 — 현황판(합계·활동일)은 설치 즉시 평생 기록을 보여준다.
+ * 캐릭터 성장에는 백필이 들어가지 않으므로(라이브 감지부터 Lv.1) 한 번만 돌리면 된다.
+ * 수동 재실행: npm run backfill
+ */
+const globalGuard = globalThis as unknown as { tokenmonBackfillSpawned?: boolean };
+function ensureBackfillOnce(): void {
+  if (globalGuard.tokenmonBackfillSpawned) return;
+  globalGuard.tokenmonBackfillSpawned = true;
+  try {
+    const meta = JSON.parse(readFileSync(metaFile, "utf8")) as { autoBackfillAt?: unknown };
+    if (typeof meta.autoBackfillAt === "string") return; // 이미 돌렸다
+  } catch {
+    /* meta 없음 = 첫 실행 */
+  }
+  const script = join(process.cwd(), "scripts", "backfill.js");
+  if (!existsSync(script)) return;
+  try {
+    mkdirSync(join(homedir(), ".claude", "tokenmon"), { recursive: true });
+    writeFileSync(metaFile, JSON.stringify({ autoBackfillAt: new Date().toISOString() }));
+    spawn(process.execPath, [script], { detached: true, stdio: "ignore" }).unref();
+  } catch {
+    /* 실패해도 대시보드는 라이브 수집만으로 동작한다 */
+  }
+}
 
 function readSnapshots(): TokenmonSnapshot[] {
   try {
@@ -46,6 +74,7 @@ function readIgnoreProjectNames(): string[] {
 }
 
 export async function TokenmonSection({ langOverride }: { langOverride?: string } = {}) {
+  ensureBackfillOnce();
   const persisted = readSnapshots();
   // statusline 수집기가 담당 중인 세션은 테일링에서 제외 (statusline 쪽 데이터가 더 풍부)
   const statuslineIds = new Set(
