@@ -40,8 +40,8 @@ export interface TokenmonPayload {
     five_hour?: TokenmonRateWindowPayload | null;
     seven_day?: TokenmonRateWindowPayload | null;
   } | null;
-  /** 백필 스냅샷(`npm run backfill`) 전용 — 과거 기록 요약. */
-  backfill?: { sessions?: number | null; first_at?: string | null } | null;
+  /** 백필 스냅샷(`npm run backfill`) 전용 — 과거 기록 요약. days는 로컬 "YYYY-MM-DD" 활동일 목록. */
+  backfill?: { sessions?: number | null; first_at?: string | null; days?: string[] | null } | null;
 }
 
 export interface TokenmonSnapshot {
@@ -112,6 +112,8 @@ export interface TokenmonSession {
   projectDir: string;
   /** 백필 스냅샷이 대표하는 과거 세션 수(일반 세션은 0). */
   historySessions: number;
+  /** 이 스냅샷이 커버하는 활동일("YYYY-MM-DD", 로컬) — 출석·스트릭 계산용. */
+  historyDays: string[];
 }
 
 /** 백필 의사 세션인지 — 성장·누적에는 포함하되 "최근 세션" 차트에서는 제외한다. */
@@ -246,7 +248,13 @@ function toSession(snapshot: TokenmonSnapshot): TokenmonSession {
     apiDurationMs: num(payload.cost?.total_api_duration_ms) ?? 0,
     projectDir: payload.workspace?.project_dir ?? payload.workspace?.current_dir ?? payload.cwd ?? "",
     historySessions: num(payload.backfill?.sessions) ?? 0,
+    historyDays: Array.isArray(payload.backfill?.days) ? payload.backfill.days.filter((d): d is string => typeof d === "string") : [],
   };
+}
+
+/** 출석 계산용 로컬 날짜 키 — "YYYY-MM-DD". */
+function localDayKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 /** 경로 비교용 정규화 — 윈도우 경로는 대소문자·구분자 차이를 무시한다. */
@@ -418,13 +426,15 @@ export function deriveTokenmonState(
     })
     .sort((a, b) => Number(b.active) - Number(a.active) || Date.parse(b.lastSeenAt) - Date.parse(a.lastSeenAt));
 
-  // 연속 출석 스트릭 — 오늘 아직 안 썼어도 어제까지의 연속은 살아있다.
-  const dayKeys = new Set(allSessions.map((session) => new Date(session.savedAt).toDateString()));
-  const fedToday = dayKeys.has(new Date(nowMs).toDateString());
+  // 연속 출석 스트릭 — 백필이 남긴 과거 활동일까지 합쳐 평생 기록 기준으로 센다.
+  // 오늘 아직 안 썼어도 어제까지의 연속은 살아있다.
+  const dayKeys = new Set(allSessions.map((session) => localDayKey(new Date(session.savedAt))));
+  for (const session of allSessions) for (const day of session.historyDays) dayKeys.add(day);
+  const fedToday = dayKeys.has(localDayKey(new Date(nowMs)));
   let streakDays = 0;
   const cursor = new Date(nowMs);
   if (!fedToday) cursor.setDate(cursor.getDate() - 1);
-  while (dayKeys.has(cursor.toDateString())) {
+  while (dayKeys.has(localDayKey(cursor))) {
     streakDays += 1;
     cursor.setDate(cursor.getDate() - 1);
   }
@@ -437,7 +447,7 @@ export function deriveTokenmonState(
     outputTokens: allSessions.reduce((sum, session) => sum + session.outputTokens, 0),
     costUsd: Number(allSessions.reduce((sum, session) => sum + (session.costUsd ?? 0), 0).toFixed(2)),
     sessionCount: liveSessions.length + allSessions.reduce((sum, session) => sum + session.historySessions, 0),
-    activeDays: new Set(allSessions.map((session) => new Date(session.savedAt).toDateString())).size,
+    activeDays: dayKeys.size,
   };
 
   return {

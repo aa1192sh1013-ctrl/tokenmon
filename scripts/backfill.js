@@ -44,6 +44,11 @@ function basename(p) {
   return parts.length ? parts[parts.length - 1] : String(p);
 }
 
+function dayKey(ms) {
+  const d = new Date(ms);
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+
 async function aggregateFile(file, agg) {
   const seen = new Set();
   const rl = readline.createInterface({ input: fs.createReadStream(file, { encoding: "utf8" }), crlfDelay: Infinity });
@@ -61,6 +66,7 @@ async function aggregateFile(file, agg) {
       if (!Number.isNaN(ts)) {
         if (ts < agg.firstMs) agg.firstMs = ts;
         if (ts > agg.lastMs) agg.lastMs = ts;
+        if (agg.days) agg.days.add(dayKey(ts));
       }
     }
     const usage = obj.message && obj.message.usage;
@@ -105,7 +111,7 @@ async function main() {
     } catch {
       continue;
     }
-    const agg = { input: 0, cacheCreate: 0, cacheRead: 0, output: 0, sessions: 0, skipped: 0, firstMs: Infinity, lastMs: 0, cwd: null };
+    const agg = { input: 0, cacheCreate: 0, cacheRead: 0, output: 0, sessions: 0, skipped: 0, firstMs: Infinity, lastMs: 0, cwd: null, days: new Set() };
     for (const file of files) {
       const sessionId = file.slice(0, -6);
       const filePath = path.join(dirPath, file);
@@ -123,7 +129,7 @@ async function main() {
           mtimeMs = fs.statSync(filePath).mtimeMs;
         } catch {}
         if (Date.now() - mtimeMs >= 60 * 60_000) {
-          const solo = { input: 0, cacheCreate: 0, cacheRead: 0, output: 0, firstMs: Infinity, lastMs: 0, cwd: null };
+          const solo = { input: 0, cacheCreate: 0, cacheRead: 0, output: 0, firstMs: Infinity, lastMs: 0, cwd: null, days: new Set() };
           try {
             await aggregateFile(filePath, solo);
             const tailPath = path.join(SESSIONS_DIR, sanitize(`transcript-${sessionId}`) + ".json");
@@ -140,6 +146,7 @@ async function main() {
                   context_window_size: null,
                   used_percentage: null,
                 },
+                backfill: { sessions: 0, first_at: null, days: [...solo.days].sort() },
               },
             };
             fs.writeFileSync(tailPath, JSON.stringify(body));
@@ -171,7 +178,11 @@ async function main() {
         model: { id: "backfill", display_name: "history" },
         cost: { total_cost_usd: null, total_duration_ms: 0, total_api_duration_ms: 0, total_lines_added: 0, total_lines_removed: 0 },
         context_window: { total_input_tokens: agg.input + agg.cacheCreate + agg.cacheRead, total_output_tokens: agg.output },
-        backfill: { sessions: agg.sessions, first_at: Number.isFinite(agg.firstMs) ? new Date(agg.firstMs).toISOString() : null },
+        backfill: {
+          sessions: agg.sessions,
+          first_at: Number.isFinite(agg.firstMs) ? new Date(agg.firstMs).toISOString() : null,
+          days: [...agg.days].sort(),
+        },
       },
     };
     fs.writeFileSync(path.join(SESSIONS_DIR, sanitize("backfill-" + entry.name) + ".json"), JSON.stringify(body));
