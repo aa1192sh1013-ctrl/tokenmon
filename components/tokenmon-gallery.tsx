@@ -68,7 +68,7 @@ export function TokenmonGallery() {
       </div>
       <div className="tm-gallery-row">
         <p className="tm-gallery-odds">
-          레벨 성장 미리보기 <span>Lv.1 알 → 레벨마다 몸집·장비가 늘어나요</span>
+          레벨 성장 미리보기 <span>Lv.1 아기 → Lv.20 최종형 — 레벨마다 모습이 달라져요</span>
         </p>
         <div className="tm-roster">
           {GROWTH_LEVELS.map((level) => (

@@ -5,7 +5,7 @@
 Tired of typing `/usage` to check your Claude Code limits? Tokenmon turns your usage into a little creature that lives in a local dashboard:
 
 - **Every project raises its own mecha companion**: each project rolls one of **60 distinct animal-mecha species** — 50 commons (mammals, predators, birds, reptiles, fish, sea creatures) plus 10 rares ✨ (5 dinos, 5 mythical beasts) — and separately rolls one of **12 colors** (red/orange/yellow/green/blue/indigo/violet/white/black/gold/silver/bronze), both deterministically from the project name. Every character carries robot hardware: a chest core plate with a glowing power core, panel seams, shoulder bolts, and tech-glow eyes. Projects you're working on right now are awake; the rest go into power-save 💤. Browse them all at `/gallery`.
-- **Lv.1–20, no stage classes — just continuous growth**: Lv.1 is an incubator egg; from Lv.2 your mecha grows bigger every level and earns robot upgrades (ear chips → antenna → core ring → booster feet → shoulder armor → arm bands → core overcharge → visor → wing jets → gold emblem → energy particles → golden aura at 15 → a cape at 18 → the crown at 👑Lv.20 MAX, 5,700 XP ≈ 5.7B total tokens — months of unhinged daily usage).
+- **Lv.1–20, no stage classes — just continuous growth**: every species has 20 unique illustrated evolution stages, from a wide-eyed Lv.1 baby bot to a fully-armored Lv.20 war machine (👑MAX at 5,700 XP ≈ 5.7B total tokens — months of unhinged daily usage). The sprite gets bigger and meaner every single level.
 - **Don't waste what you already paid for**: the 5-hour bowl and weekly bucket gauges show how much of your subscription capacity you've actually eaten — whatever's left at reset **evaporates** 💸. The panel counts down to the next evaporation and reports how much you wasted last window.
 - **Neglect has consequences**: leave a project untouched for 3+ days and its character starts starving 🥀 — XP withers ~3% a day and levels can drop — until one session restores it in full. Skip a day and your streak 🔥 is gone.
 - **Real numbers, not just percentages**: per-session output tokens up front; input (cache included) and cost in the table.
@@ -80,9 +80,11 @@ Claude Code pipes session JSON into whatever command is configured as your [stat
 
 | Tier | Species | Odds each |
 |---|---|---|
-| Common (50) | 강아지·고양이·토끼·곰·판다·코알라·햄스터·생쥐·다람쥐·고슴도치·사슴·말·양·염소·젖소·돼지·코끼리·원숭이·수달·너구리 · 늑대·여우·호랑이·사자·치타·악어·뱀·박쥐·매·까마귀 · 오리·병아리·펭귄·부엉이·앵무·공작·플라밍고·백조·개구리·거북 · 상어·범고래·금붕어·복어·문어·해파리·게·가오리·해마·카멜레온 | 1.8% |
-| Dino ✨ (5) | 티라노봇 · 트리케라봇 · 스테고봇 · 브라키오봇 · 프테라봇 | **1.2%** |
-| Mythic ✨ (5) | 유니콘봇 · 드래곤봇 · 불사조봇 · 구미호봇 · 페가수스봇 | **0.8%** |
+| Common (50) | 늑대·여우·강아지·고양이·사자·호랑이·표범·치타·곰·판다 · 토끼·사슴·염소·말·들소·코끼리·코뿔소·고릴라·원숭이·수달 · 너구리·캥거루·박쥐·독수리·부엉이·까마귀·매·펭귄·공작·앵무 · 두루미·악어·코브라·카멜레온·거북·개구리·상어·범고래·돌고래·고래 · 문어·오징어·게·가오리·해마·사슴벌레·사마귀·전갈·거미·나비 | 1.8% |
+| Dino ✨ (5) | 티라노봇 · 트리케라봇 · 랩터봇 · 안킬로봇 · 프테라봇 | **1.2%** |
+| Mythic ✨ (5) | 드래곤봇 · 불사조봇 · 그리핀봇 · 키린봇 · 케르베로스봇 | **0.8%** |
+
+Every species ships with **20 hand-illustrated evolution stages** (Lv.1 baby bot → Lv.20 final form) as mecha-animal concept art, tinted per project by the color roll.
 
 Color (12 options) rolls on a separate hash, so two projects with the same species can still look different. Both rolls are deterministic from the project name — no rerolls, no crying. (Renaming the folder to reroll is between you and your conscience.)
 
@@ -97,7 +99,7 @@ Timestamped backups of `settings.json` are left in `~/.claude/`.
 
 ## 한국어
 
-Claude Code 사용량으로 키우는 토큰 다마고치예요. 프로젝트 폴더마다 메카 동물 캐릭터가 한 마리씩 부화해서(60종 × 12색 랜덤), 총 토큰 100만 개당 1 XP로 Lv.20까지 자랍니다. 레벨마다 장비가 늘고, 3일 넘게 방치하면 굶어서 XP가 마르고, 5시간 밥그릇을 안 비우면 그만큼 증발해요. 전부 로컬에서만 돌고 대화 내용은 절대 수집하지 않아요. `npm run setup` 한 번이면 연결 끝!
+Claude Code 사용량으로 키우는 토큰 다마고치예요. 프로젝트 폴더마다 메카 동물 캐릭터가 한 마리씩 부화해서(60종 × 12색 랜덤), 총 토큰 100만 개당 1 XP로 Lv.20까지 자랍니다. 레벨마다 진화 일러스트가 통째로 바뀌고, 3일 넘게 방치하면 굶어서 XP가 마르고, 5시간 밥그릇을 안 비우면 그만큼 증발해요. 전부 로컬에서만 돌고 대화 내용은 절대 수집하지 않아요. `npm run setup` 한 번이면 연결 끝!
 
 ## License
 

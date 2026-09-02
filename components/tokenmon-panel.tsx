@@ -62,7 +62,7 @@ export function TokenmonPanel({ state }: { state: TokenmonState }) {
         </span>
       </div>
       {state.pets.length === 0 ? (
-        <div className="state">아직 부화한 캐릭터가 없어요. Claude Code로 아무 프로젝트나 작업하면 알이 생깁니다.</div>
+        <div className="state">아직 부화한 캐릭터가 없어요. Claude Code로 아무 프로젝트나 작업하면 캐릭터가 태어납니다.</div>
       ) : (
         <div className="tm-roster">
           {state.pets.slice(0, MAX_PETS).map((pet) => (

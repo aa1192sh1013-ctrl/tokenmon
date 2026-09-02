@@ -68,16 +68,16 @@ export type TokenmonMood = "happy" | "content" | "sleeping" | "starving";
 /** 종 ID — 동물 50종 + 레어 10종, 각자 고유 형태. */
 export type TokenmonSpecies = string;
 
-/** 흔한 종 50가지 — 전부 서로 다른 동물 (초식·육식·조류·어류·수중 포함). */
+/** 흔한 종 50가지 — 전부 서로 다른 동물 (초식·육식·조류·어류·수중·곤충 포함). */
 export const COMMON_SPECIES_IDS: readonly string[] = [
-  "dog", "cat", "bunny", "bear", "panda", "koala", "hamster", "mouse", "squirrel", "hedgehog",
-  "deer", "horse", "sheep", "goat", "cow", "pig", "elephant", "monkey", "otter", "raccoon",
-  "wolf", "fox", "tiger", "lion", "cheetah", "croc", "snake", "bat", "hawk", "crow",
-  "duck", "chick", "penguin", "owl", "parrot", "peacock", "flamingo", "swan", "frog", "turtle",
-  "shark", "orca", "goldfish", "puffer", "octopus", "jellyfish", "crab", "ray", "seahorse", "chameleon",
+  "wolf", "fox", "dog", "cat", "lion", "tiger", "leopard", "cheetah", "bear", "panda",
+  "rabbit", "deer", "goat", "horse", "bison", "elephant", "rhino", "gorilla", "monkey", "otter",
+  "raccoon", "kangaroo", "bat", "eagle", "owl", "raven", "falcon", "penguin", "peacock", "parrot",
+  "crane", "crocodile", "cobra", "chameleon", "turtle", "frog", "shark", "orca", "dolphin", "whale",
+  "octopus", "squid", "crab", "manta", "seahorse", "stagbeetle", "mantis", "scorpion", "spider", "butterfly",
 ];
-export const DINO_SPECIES_IDS: readonly string[] = ["tyranno", "tricera", "stego", "brachio", "ptera"];
-export const MYTHIC_SPECIES_IDS: readonly string[] = ["unicorn", "dragonet", "phoenix", "gumiho", "pegasus"];
+export const DINO_SPECIES_IDS: readonly string[] = ["tyranno", "tricera", "raptor", "anky", "ptera"];
+export const MYTHIC_SPECIES_IDS: readonly string[] = ["dragon", "phoenix", "griffin", "qilin", "cerberus"];
 export const RARE_SPECIES: readonly string[] = [...DINO_SPECIES_IDS, ...MYTHIC_SPECIES_IDS];
 
 /** 색상 12종 — 빨·주·노·초·파·남·보·흰·검·금·은·동. 종과 별개로 랜덤 배정. */

@@ -1,150 +1,113 @@
 import type { TokenmonColor, TokenmonSpecies } from "@/lib/tokenmon";
 
 /**
- * 종족 레지스트리 — 서로 다른 동물 50종 + 공룡류 5종 + 환수종 5종.
- * 각 종은 측면 실루엣 리그(rig)와 파라미터(p)로 정의된다 — 사족보행 메카,
- * 새, 어류, 소형 착석형 등 실제 동물 자세가 그대로 보이는 방식.
- * 색(12종)은 종과 별개로 프로젝트마다 랜덤 배정된다.
+ * 종 도감 — 60종 메카 동물(일러스트 스프라이트).
+ * 스프라이트는 /public/species/<id>/<level>.jpg (Lv.1~20, 레벨마다 다른 모습).
+ * 색상은 원본 일러스트(은빛 메탈 + 시안 발광) 위에 CSS 필터로 입힌다.
  */
 
-export const GOLD = "#d4a842";
-/** 코어·글로우 등 로봇 부품 공통 발광색. */
-export const TECH = "#5fd8cc";
-
-export interface ColorDef {
-  label: string;
-  base: string;
-}
-
-export const COLOR_DEFS: Record<TokenmonColor, ColorDef> = {
-  red: { label: "빨강", base: "#c9504e" },
-  orange: { label: "주황", base: "#d97e35" },
-  yellow: { label: "노랑", base: "#d9b440" },
-  green: { label: "초록", base: "#55a065" },
-  blue: { label: "파랑", base: "#4d86c6" },
-  indigo: { label: "남색", base: "#4a5b9e" },
-  violet: { label: "보라", base: "#8a5fae" },
-  white: { label: "하양", base: "#e6e9ee" },
-  black: { label: "까망", base: "#3c4049" },
-  gold: { label: "금", base: "#c9a23f" },
-  silver: { label: "은", base: "#aeb6c2" },
-  bronze: { label: "동", base: "#a67a4a" },
-};
-
-export type RigKind =
-  | "quad" // 사족보행 (늑대·호랑이·말 등)
-  | "sit" // 앉은 소형 (토끼·햄스터·곰 등)
-  | "bird" // 조류 (서 있는 측면)
-  | "fish" // 어류 (호버링)
-  | "trex" // 이족 공룡
-  | "snake"
-  | "turtle"
-  | "bat"
-  | "crab"
-  | "octo"
-  | "jelly";
-
-export interface SpeciesParams {
-  /** 주둥이: wolf | cat | dog | horse | block | pig | croc | trunk | none */
-  muzzle?: string;
-  /** 귀: point | bigpoint | round | floppy | long | side | huge | tuft | fluff | none */
-  ear?: string;
-  /** 꼬리: bushy | tipped | up | flow | stub | thin | curl | spade | spike | puff | ring | flat | none */
-  tail?: string;
-  /** 부리(조류): flat | tiny | tri | hook | sharp | bent */
-  beak?: string;
-  /** 추가 요소들 */
-  extras?: readonly string[];
-  /** 목이 긴 변형(quad: 브라키오, bird: 플라밍고·백조) */
-  longNeck?: boolean;
-  /** 낮고 긴 몸 (악어) */
-  low?: boolean;
-}
-
-export interface SpeciesDef {
+export interface SpeciesInfo {
   label: string;
   cry: string;
-  rig: RigKind;
-  p: SpeciesParams;
-  rare?: boolean;
-  rareKind?: "dino" | "mythic";
+  rare: boolean;
 }
 
-export const SPECIES_DEFS: Record<string, SpeciesDef> = {
-  /* ---- 사족보행 포유류 ---- */
-  dog: { label: "강아지봇", cry: "멍!", rig: "quad", p: { muzzle: "dog", ear: "floppy", tail: "up" } },
-  cat: { label: "고양이봇", cry: "냐옹", rig: "quad", p: { muzzle: "cat", ear: "point", tail: "up", extras: ["whiskers"] } },
-  wolf: { label: "늑대봇", cry: "아우~", rig: "quad", p: { muzzle: "wolf", ear: "point", tail: "bushy", extras: ["fang"] } },
-  fox: { label: "여우봇", cry: "콘!", rig: "quad", p: { muzzle: "wolf", ear: "bigpoint", tail: "tipped" } },
-  tiger: { label: "호랑이봇", cry: "어흥", rig: "quad", p: { muzzle: "cat", ear: "round", tail: "up", extras: ["stripes", "fang"] } },
-  lion: { label: "사자봇", cry: "크앙", rig: "quad", p: { muzzle: "cat", ear: "round", tail: "tuftTail", extras: ["mane", "fang"] } },
-  cheetah: { label: "치타봇", cry: "슝!", rig: "quad", p: { muzzle: "cat", ear: "round", tail: "thin", extras: ["spots", "tear"] } },
-  deer: { label: "사슴봇", cry: "총총", rig: "quad", p: { muzzle: "horse", ear: "side", tail: "stub", extras: ["antler"] } },
-  horse: { label: "말봇", cry: "히힝", rig: "quad", p: { muzzle: "horse", ear: "point", tail: "flow", extras: ["mane"] } },
-  sheep: { label: "양봇", cry: "메에", rig: "quad", p: { muzzle: "block", ear: "side", tail: "stub", extras: ["wool"] } },
-  goat: { label: "염소봇", cry: "매애", rig: "quad", p: { muzzle: "block", ear: "side", tail: "stub", extras: ["hornsBack", "beard"] } },
-  cow: { label: "젖소봇", cry: "음머", rig: "quad", p: { muzzle: "block", ear: "side", tail: "tuftTail", extras: ["hornsSmall", "spots"] } },
-  pig: { label: "돼지봇", cry: "꿀꿀", rig: "quad", p: { muzzle: "pig", ear: "point", tail: "curl" } },
-  elephant: { label: "코끼리봇", cry: "뿌우", rig: "quad", p: { muzzle: "trunk", ear: "huge", tail: "thin" } },
-  croc: { label: "악어봇", cry: "덥석", rig: "quad", p: { muzzle: "croc", ear: "none", tail: "spike", low: true, extras: ["ridges"] } },
-  /* ---- 앉은 소형 ---- */
-  bunny: { label: "토끼봇", cry: "촐랑", rig: "sit", p: { ear: "long", tail: "puff", extras: ["teeth"] } },
-  hamster: { label: "햄스터봇", cry: "오물", rig: "sit", p: { ear: "round", tail: "stub", extras: ["cheek", "teeth"] } },
-  mouse: { label: "생쥐봇", cry: "찍!", rig: "sit", p: { ear: "big", tail: "thin", extras: ["whiskers"] } },
-  squirrel: { label: "다람쥐봇", cry: "탁탁", rig: "sit", p: { ear: "tuft", tail: "bigbush", extras: ["teeth"] } },
-  hedgehog: { label: "고슴도치봇", cry: "콕콕", rig: "sit", p: { ear: "none", tail: "none", extras: ["spikes"] } },
-  koala: { label: "코알라봇", cry: "쿨…", rig: "sit", p: { ear: "fluff", tail: "none", extras: ["bignose"] } },
-  panda: { label: "판다봇", cry: "우물", rig: "sit", p: { ear: "round", tail: "stub", extras: ["patch"] } },
-  bear: { label: "곰봇", cry: "크릉", rig: "sit", p: { ear: "round", tail: "stub", extras: ["chunky"] } },
-  monkey: { label: "원숭이봇", cry: "우끼", rig: "sit", p: { ear: "side", tail: "curlLong", extras: ["facePatch"] } },
-  otter: { label: "수달봇", cry: "뽀글", rig: "sit", p: { ear: "round", tail: "flat", extras: ["whiskers"] } },
-  raccoon: { label: "너구리봇", cry: "부스럭", rig: "sit", p: { ear: "point", tail: "ring", extras: ["mask"] } },
-  frog: { label: "개구리봇", cry: "개굴", rig: "sit", p: { ear: "none", tail: "none", extras: ["frogEyes", "crouch"] } },
-  chameleon: { label: "카멜레온봇", cry: "쓱…", rig: "sit", p: { ear: "none", tail: "spiral", extras: ["crest", "coneEye"] } },
-  /* ---- 조류 ---- */
-  duck: { label: "오리봇", cry: "꽥!", rig: "bird", p: { beak: "flat", extras: ["curl"] } },
-  chick: { label: "병아리봇", cry: "삐약", rig: "bird", p: { beak: "tiny", extras: ["crest3"] } },
-  penguin: { label: "펭귄봇", cry: "펭!", rig: "bird", p: { beak: "tri", extras: ["upright", "belly"] } },
-  owl: { label: "부엉이봇", cry: "부엉", rig: "bird", p: { beak: "tri", extras: ["upright", "discs", "tufts"] } },
-  parrot: { label: "앵무봇", cry: "안녕!", rig: "bird", p: { beak: "hook", extras: ["crestTall"] } },
-  crow: { label: "까마귀봇", cry: "까악", rig: "bird", p: { beak: "sharp", extras: ["tuftHead"] } },
-  hawk: { label: "매봇", cry: "휘익", rig: "bird", p: { beak: "hook", extras: ["brow"] } },
-  peacock: { label: "공작봇", cry: "화락", rig: "bird", p: { beak: "tiny", extras: ["fanTail", "pins"] } },
-  flamingo: { label: "플라밍고봇", cry: "훌쩍", rig: "bird", p: { beak: "bent", longNeck: true, extras: ["oneLeg"] } },
-  swan: { label: "백조봇", cry: "스르륵", rig: "bird", p: { beak: "flat", longNeck: true } },
-  /* ---- 어류·수중 ---- */
-  shark: { label: "상어봇", cry: "철컥", rig: "fish", p: { extras: ["dorsalBig", "teeth", "gills", "sharpNose"] } },
-  orca: { label: "범고래봇", cry: "쏴아", rig: "fish", p: { extras: ["dorsalBig", "orcaPatch", "belly"] } },
-  goldfish: { label: "금붕어봇", cry: "뻐끔", rig: "fish", p: { extras: ["flowTail", "lips"] } },
-  puffer: { label: "복어봇", cry: "빵!", rig: "fish", p: { extras: ["roundBody", "spikes", "lips"] } },
-  ray: { label: "가오리봇", cry: "팔랑", rig: "fish", p: { extras: ["wide", "whipTail"] } },
-  seahorse: { label: "해마봇", cry: "말랑", rig: "fish", p: { extras: ["upright", "tube", "finBack"] } },
-  turtle: { label: "거북봇", cry: "엉금", rig: "turtle", p: {} },
-  snake: { label: "뱀봇", cry: "스륵", rig: "snake", p: {} },
-  bat: { label: "박쥐봇", cry: "끼익", rig: "bat", p: {} },
-  crab: { label: "게봇", cry: "집게!", rig: "crab", p: {} },
-  octopus: { label: "문어봇", cry: "꾸물", rig: "octo", p: {} },
-  jellyfish: { label: "해파리봇", cry: "둥둥", rig: "jelly", p: {} },
-  /* ---- 공룡류 (레어) ---- */
-  tyranno: { label: "티라노봇", cry: "쿠앙!", rig: "trex", p: {}, rare: true, rareKind: "dino" },
-  tricera: { label: "트리케라봇", cry: "푸릉!", rig: "quad", p: { muzzle: "block", ear: "none", tail: "thick", extras: ["frill", "horn3"] }, rare: true, rareKind: "dino" },
-  stego: { label: "스테고봇", cry: "우걱!", rig: "quad", p: { muzzle: "block", ear: "none", tail: "spike", extras: ["plates"] }, rare: true, rareKind: "dino" },
-  brachio: { label: "브라키오봇", cry: "뿌우!", rig: "quad", p: { muzzle: "block", ear: "none", tail: "thick", longNeck: true }, rare: true, rareKind: "dino" },
-  ptera: { label: "프테라봇", cry: "끼에엑!", rig: "bat", p: { extras: ["pteraCrest", "beak"] }, rare: true, rareKind: "dino" },
-  /* ---- 환수종 (레어) ---- */
-  unicorn: { label: "유니콘봇", cry: "뿅!", rig: "quad", p: { muzzle: "horse", ear: "point", tail: "flow", extras: ["mane", "hornSpiral"] }, rare: true, rareKind: "mythic" },
-  dragonet: { label: "드래곤봇", cry: "크앙!", rig: "quad", p: { muzzle: "wolf", ear: "none", tail: "spade", extras: ["hornsBack", "wings", "fang"] }, rare: true, rareKind: "mythic" },
-  phoenix: { label: "불사조봇", cry: "화르륵!", rig: "bird", p: { beak: "tiny", extras: ["flameCrest", "flameTail"] }, rare: true, rareKind: "mythic" },
-  gumiho: { label: "구미호봇", cry: "콘…", rig: "quad", p: { muzzle: "wolf", ear: "bigpoint", tail: "none", extras: ["ninetails"] }, rare: true, rareKind: "mythic" },
-  pegasus: { label: "페가수스봇", cry: "히힝!", rig: "quad", p: { muzzle: "horse", ear: "point", tail: "flow", extras: ["mane", "wings"] }, rare: true, rareKind: "mythic" },
+export const SPECIES_DEFS: Record<string, SpeciesInfo> = {
+  /* ---------- 흔한 종 50 ---------- */
+  wolf: { label: "늑대봇", cry: "아우~", rare: false },
+  fox: { label: "여우봇", cry: "콘!", rare: false },
+  dog: { label: "멍멍봇", cry: "멍!", rare: false },
+  cat: { label: "냥냥봇", cry: "냐옹", rare: false },
+  lion: { label: "사자봇", cry: "어흥!", rare: false },
+  tiger: { label: "호랑이봇", cry: "크앙!", rare: false },
+  leopard: { label: "표범봇", cry: "그르릉", rare: false },
+  cheetah: { label: "치타봇", cry: "슈웅!", rare: false },
+  bear: { label: "곰봇", cry: "크엉", rare: false },
+  panda: { label: "판다봇", cry: "우물우물", rare: false },
+  rabbit: { label: "토끼봇", cry: "깡총", rare: false },
+  deer: { label: "사슴봇", cry: "타닥", rare: false },
+  goat: { label: "염소봇", cry: "메에", rare: false },
+  horse: { label: "말봇", cry: "히힝", rare: false },
+  bison: { label: "들소봇", cry: "푸릉!", rare: false },
+  elephant: { label: "코끼리봇", cry: "뿌우~", rare: false },
+  rhino: { label: "코뿔소봇", cry: "쿵쿵", rare: false },
+  gorilla: { label: "고릴라봇", cry: "우호!", rare: false },
+  monkey: { label: "원숭이봇", cry: "우끼!", rare: false },
+  otter: { label: "수달봇", cry: "찹찹", rare: false },
+  raccoon: { label: "너구리봇", cry: "부스럭", rare: false },
+  kangaroo: { label: "캥거루봇", cry: "폴짝!", rare: false },
+  bat: { label: "박쥐봇", cry: "끼릭", rare: false },
+  eagle: { label: "독수리봇", cry: "끼요오!", rare: false },
+  owl: { label: "부엉이봇", cry: "부엉", rare: false },
+  raven: { label: "까마귀봇", cry: "까악", rare: false },
+  falcon: { label: "매봇", cry: "삐이익!", rare: false },
+  penguin: { label: "펭귄봇", cry: "뒤뚱", rare: false },
+  peacock: { label: "공작봇", cry: "촤르륵", rare: false },
+  parrot: { label: "앵무봇", cry: "안녕!", rare: false },
+  crane: { label: "두루미봇", cry: "뚜루루", rare: false },
+  crocodile: { label: "악어봇", cry: "철컥!", rare: false },
+  cobra: { label: "코브라봇", cry: "스스슥", rare: false },
+  chameleon: { label: "카멜레온봇", cry: "늘름", rare: false },
+  turtle: { label: "거북봇", cry: "느긋~", rare: false },
+  frog: { label: "개굴봇", cry: "개굴!", rare: false },
+  shark: { label: "상어봇", cry: "슈욱!", rare: false },
+  orca: { label: "범고래봇", cry: "촤아!", rare: false },
+  dolphin: { label: "돌고래봇", cry: "끼익끼익", rare: false },
+  whale: { label: "고래봇", cry: "부우웅~", rare: false },
+  octopus: { label: "문어봇", cry: "물컹", rare: false },
+  squid: { label: "오징어봇", cry: "슉슉", rare: false },
+  crab: { label: "게봇", cry: "집게집게", rare: false },
+  manta: { label: "가오리봇", cry: "팔랑~", rare: false },
+  seahorse: { label: "해마봇", cry: "동동", rare: false },
+  stagbeetle: { label: "사슴벌레봇", cry: "집게발!", rare: false },
+  mantis: { label: "사마귀봇", cry: "샥샥!", rare: false },
+  scorpion: { label: "전갈봇", cry: "찌릿!", rare: false },
+  spider: { label: "거미봇", cry: "스륵스륵", rare: false },
+  butterfly: { label: "나비봇", cry: "팔랑팔랑", rare: false },
+  /* ---------- 공룡류 (RARE) ---------- */
+  tyranno: { label: "티라노봇", cry: "크르르릉!", rare: true },
+  tricera: { label: "트리케라봇", cry: "두두둥", rare: true },
+  raptor: { label: "랩터봇", cry: "캬악!", rare: true },
+  anky: { label: "안킬로봇", cry: "텅텅!", rare: true },
+  ptera: { label: "프테라봇", cry: "키에엑!", rare: true },
+  /* ---------- 환수종 (RARE) ---------- */
+  dragon: { label: "드래곤봇", cry: "화르륵!", rare: true },
+  phoenix: { label: "불사조봇", cry: "파아앗!", rare: true },
+  griffin: { label: "그리핀봇", cry: "키이잉!", rare: true },
+  qilin: { label: "키린봇", cry: "딸랑~", rare: true },
+  cerberus: { label: "케르베로스봇", cry: "왈!왈!왈!", rare: true },
 };
 
-const FALLBACK: SpeciesDef = { label: "미확인봇", cry: "…?", rig: "sit", p: {} };
+const FALLBACK: SpeciesInfo = { label: "멍멍봇", cry: "멍!", rare: false };
 
-export function getSpeciesInfo(species: TokenmonSpecies): SpeciesDef {
+export function getSpeciesInfo(species: TokenmonSpecies): SpeciesInfo {
   return SPECIES_DEFS[species] ?? FALLBACK;
 }
 
-export function getColorInfo(color: TokenmonColor): ColorDef {
+/** 색상 12종 — 원본(은빛+시안) 일러스트에 입히는 CSS 필터. */
+export interface ColorInfo {
+  label: string;
+  /** 스프라이트 <img>에 적용할 filter 값. */
+  filter: string;
+  /** 색 견본용 대표색 (UI 장식용). */
+  swatch: string;
+}
+
+export const COLOR_DEFS: Record<TokenmonColor, ColorInfo> = {
+  red: { label: "빨강", filter: "hue-rotate(170deg) saturate(1.15)", swatch: "#c8483f" },
+  orange: { label: "주황", filter: "hue-rotate(200deg) saturate(1.2) brightness(1.03)", swatch: "#d07030" },
+  yellow: { label: "노랑", filter: "hue-rotate(230deg) saturate(1.2) brightness(1.06)", swatch: "#c9a227" },
+  green: { label: "초록", filter: "hue-rotate(-60deg) saturate(1.1)", swatch: "#3f9a52" },
+  blue: { label: "파랑", filter: "hue-rotate(35deg) saturate(1.15)", swatch: "#3d6fc4" },
+  indigo: { label: "남색", filter: "hue-rotate(75deg) saturate(1.1) brightness(0.97)", swatch: "#44519e" },
+  violet: { label: "보라", filter: "hue-rotate(100deg) saturate(1.15)", swatch: "#8a4fae" },
+  white: { label: "하양", filter: "saturate(0.25) brightness(1.1) contrast(0.96)", swatch: "#e8e6e0" },
+  black: { label: "검정", filter: "saturate(0.55) brightness(0.72) contrast(1.18)", swatch: "#3d3a38" },
+  gold: { label: "금", filter: "sepia(0.5) saturate(1.5) hue-rotate(-15deg) brightness(1.05)", swatch: "#d4a842" },
+  silver: { label: "은", filter: "saturate(0.2) brightness(1.02)", swatch: "#b9bcc2" },
+  bronze: { label: "동", filter: "sepia(0.6) saturate(1.35) hue-rotate(-20deg) brightness(0.92)", swatch: "#a5713c" },
+};
+
+export function getColorInfo(color: TokenmonColor): ColorInfo {
   return COLOR_DEFS[color] ?? COLOR_DEFS.silver;
 }
