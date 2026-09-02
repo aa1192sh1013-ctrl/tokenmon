@@ -5,6 +5,7 @@ import { mockTokenmonSnapshots } from "@/lib/mock";
 import { deriveTokenmonState, parseTokenmonSnapshot, type TokenmonSnapshot } from "@/lib/tokenmon";
 import { TokenmonPanel } from "./tokenmon-panel";
 import { readActiveTranscriptSnapshots, sanitizeSessionId } from "./transcript-tail";
+import { fetchApiUsage } from "./usage-api";
 import { estimateFreshFiveHour, recordUsage } from "./usage-series";
 
 const sessionsDir = join(homedir(), ".claude", "tokenmon", "sessions");
@@ -72,13 +73,20 @@ export async function TokenmonSection() {
     ignoreProjectNames: readIgnoreProjectNames(),
   });
 
-  // 게이지 공백 메우기 — 총 토큰 시계열을 기록하고, 실측이 없는 새 창은 추정치로 채운다.
+  // 밥그릇 게이지 — 1순위: 사용량 API 직접 조회(데스크탑 앱과 같은 값),
+  // 폴백: statusline 관측, 최후: 대화 로그 기반 추정.
   if (live) {
     const nowMs = Date.now();
     const grandTotal = state.totals.inputTokens + state.totals.outputTokens;
+    const apiUsage = await fetchApiUsage();
+    if (apiUsage) {
+      state.fiveHour = apiUsage.fiveHour;
+      state.sevenDay = apiUsage.sevenDay;
+    }
     recordUsage(nowMs, grandTotal, state.fiveHour && !state.fiveHour.fresh ? state.fiveHour : null);
-    if (state.fiveHour?.fresh && state.lastFiveHourResetAtMs !== null) {
-      const estimate = estimateFreshFiveHour(nowMs, grandTotal, state.lastFiveHourResetAtMs);
+    if (!apiUsage && state.fiveHour?.fresh && state.lastFiveHourResetAtMs !== null) {
+      const expiredUsedPct = 100 - (state.wastedFiveHourPct ?? 100);
+      const estimate = await estimateFreshFiveHour(nowMs, grandTotal, state.lastFiveHourResetAtMs, expiredUsedPct);
       if (estimate) state.fiveHour = { ...estimate, fresh: true, estimated: true };
     }
   }

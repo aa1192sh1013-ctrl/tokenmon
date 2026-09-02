@@ -64,6 +64,8 @@ Claude Code pipes session JSON into whatever command is configured as your [stat
 
 **Already have a status line?** Setup won't clobber it. Your original command is saved and keeps rendering exactly as before — Tokenmon chains it and collects silently. Your `settings.json` is backed up before any change.
 
+**Rate-limit gauges are fetched directly.** The bowl meters query Anthropic's usage endpoint — the same one the Claude desktop app's usage screen uses — with the OAuth token Claude Code already stores locally (`~/.claude/.credentials.json`). The token is read, never stored or logged, and the only network traffic is your machine ↔ Anthropic. This keeps the gauges live even in sessions without a status line, and falls back to status-line observations (then a transcript-based estimate) if it's unavailable. Opt out with `{ "useUsageApi": false }` in `~/.claude/tokenmon/config.json`.
+
 ## What it can and cannot show
 
 | ✅ Exact | ❌ Impossible |
