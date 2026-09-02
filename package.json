@@ -2,9 +2,12 @@
   "name": "tokenmon",
   "version": "0.1.0",
   "private": true,
-  "description": "A pixel tamagotchi for your Claude Code usage — grows as you code, gets sleepy near your rate limit, naps until it resets.",
+  "description": "A tamagotchi for your Claude Code usage — every project hatches a mecha critter (60 illustrated species, 20 evolution stages) that grows as you burn tokens, with live rate-limit bowls and streaks. Local-only.",
   "license": "MIT",
   "author": "Sunhong Min",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "next dev -p 4242",
     "build": "next build",
