@@ -73,7 +73,7 @@ Claude Code pipes session JSON into whatever command is configured as your [stat
 
 ## Leveling (per project)
 
-**1 XP = 1,000,000 total tokens** (input + cache + output — the same unit as `ccusage`'s Total Tokens column), summed over the project's sessions **since Tokenmon first saw it live** — pre-install history feeds the stats board, not the critter. The curve is gentle (~1.2× per level: 37, 44, 53, 64, … 814, ~1,000) and tops out at **5,700 XP ≈ 5.7B total tokens for Lv.20** — calibrated against real `ccusage` data from a certifiable daily heavy user: months of hard daily grinding on a single project.
+**1 XP = 1,000,000 total tokens** (input + cache + output — the same unit as `ccusage`'s Total Tokens column), summed over the project's sessions **since Tokenmon first saw it live** — pre-install history feeds the stats board, not the critter. The curve is front-loaded: early levels pop fast (cumulative 8, 18, 32, 52, 80 …) so your first evolutions land within the first sessions, then it stretches out and tops out at **5,700 XP ≈ 5.7B total tokens for Lv.20** — calibrated against real `ccusage` data from a certifiable daily heavy user: months of hard daily grinding on a single project.
 
 ## Species gacha — 60 to collect × 12 colors
 

@@ -22,7 +22,7 @@ const PROJECTS_DIR = path.join(os.homedir(), ".claude", "projects");
 const SESSIONS_DIR = path.join(os.homedir(), ".claude", "tokenmon", "sessions");
 
 /* lib/tokenmon.ts 의 LEVEL_XP와 같은 값 — 리포트 출력용 사본 (1 XP = 총 토큰 100만) */
-const LEVEL_XP = [0, 0, 37, 81, 134, 198, 274, 366, 476, 608, 766, 956, 1183, 1456, 1783, 2176, 2647, 3212, 3891, 4705, 5700];
+const LEVEL_XP = [0, 0, 8, 18, 32, 52, 80, 120, 175, 250, 350, 480, 650, 880, 1200, 1650, 2250, 3000, 3900, 4800, 5700];
 
 function levelOf(xp) {
   for (let level = 20; level >= 2; level -= 1) if (xp >= LEVEL_XP[level]) return level;
