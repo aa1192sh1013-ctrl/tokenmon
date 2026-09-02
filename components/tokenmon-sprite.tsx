@@ -31,7 +31,7 @@ export function PetSprite({
     <span className={`tm-sprite-frame ${dim ? "dim" : ""}`} style={{ width: size, height: size }} role="img" aria-label={label}>
       {/* eslint-disable-next-line @next/next/no-img-element -- 로컬 정적 스프라이트, 최적화 불필요 */}
       <img
-        src={`/species/${id}/${safeLevel}.jpg`}
+        src={`/species/${id}/${safeLevel}.webp`}
         alt=""
         width={size}
         height={size}

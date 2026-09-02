@@ -119,8 +119,8 @@ code { padding: 1px 5px; border-radius: 4px; background: var(--soft); font-size:
 .tm-wilt { position: absolute; top: -6px; right: -12px; font-size: 13px; }
 .tm-pet-card.starving .tm-sprite-frame img { filter: grayscale(.7) opacity(.88) !important; }
 
-/* 일러스트 스프라이트 프레임 — 시트 원본 크림 배경을 포토카드처럼 감싼다 */
-.tm-sprite-frame { display: inline-flex; overflow: hidden; align-items: center; justify-content: center; border-radius: 12px; background: #f7f4ea; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .06); }
+/* 일러스트 스프라이트 — 배경 누끼(투명 WebP), 은은한 바닥 그림자만 */
+.tm-sprite-frame { display: inline-flex; align-items: flex-end; justify-content: center; filter: drop-shadow(0 3px 5px rgba(40, 34, 24, .18)); }
 .tm-sprite-frame img { width: 100%; height: 100%; object-fit: contain; }
 .tm-sprite-frame.dim img { opacity: .75; }
 
