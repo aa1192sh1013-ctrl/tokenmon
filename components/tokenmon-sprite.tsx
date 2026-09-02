@@ -29,7 +29,7 @@ export function PetSprite({
   const info = getSpeciesInfo(species, lang);
   const colorInfo = getColorInfo(color, lang);
   const id = species in SPECIES_DEFS ? species : "dog";
-  const SPRITE_V = 2; // 스프라이트 교체 시 올려서 브라우저 캐시 무효화
+  const SPRITE_V = 3; // 스프라이트 교체 시 올려서 브라우저 캐시 무효화
   return (
     <span className={`tm-sprite-frame ${dim ? "dim" : ""}`} style={{ width: size, height: size }} role="img" aria-label={label}>
       {/* eslint-disable-next-line @next/next/no-img-element -- 로컬 정적 스프라이트, 최적화 불필요 */}
