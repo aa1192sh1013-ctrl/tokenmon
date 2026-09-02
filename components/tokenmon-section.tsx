@@ -5,6 +5,7 @@ import { mockTokenmonSnapshots } from "@/lib/mock";
 import { deriveTokenmonState, parseTokenmonSnapshot, type TokenmonSnapshot } from "@/lib/tokenmon";
 import { TokenmonPanel } from "./tokenmon-panel";
 import { readActiveTranscriptSnapshots, sanitizeSessionId } from "./transcript-tail";
+import { estimateFreshFiveHour, recordUsage } from "./usage-series";
 
 const sessionsDir = join(homedir(), ".claude", "tokenmon", "sessions");
 
@@ -70,5 +71,16 @@ export async function TokenmonSection() {
     ignoreProjectDirPrefixes,
     ignoreProjectNames: readIgnoreProjectNames(),
   });
+
+  // 게이지 공백 메우기 — 총 토큰 시계열을 기록하고, 실측이 없는 새 창은 추정치로 채운다.
+  if (live) {
+    const nowMs = Date.now();
+    const grandTotal = state.totals.inputTokens + state.totals.outputTokens;
+    recordUsage(nowMs, grandTotal, state.fiveHour && !state.fiveHour.fresh ? state.fiveHour : null);
+    if (state.fiveHour?.fresh && state.lastFiveHourResetAtMs !== null) {
+      const estimate = estimateFreshFiveHour(nowMs, grandTotal, state.lastFiveHourResetAtMs);
+      if (estimate) state.fiveHour = { ...estimate, fresh: true, estimated: true };
+    }
+  }
   return <TokenmonPanel state={state} />;
 }

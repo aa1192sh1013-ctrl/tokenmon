@@ -50,6 +50,26 @@ function Meter({
     );
   }
 
+  if (win.fresh && win.estimated) {
+    const level = wasteLevelOf(win.usedPct);
+    const countdown =
+      win.resetsAtMs !== null && nowMs !== null && win.resetsAtMs > nowMs ? formatDurationKo(win.resetsAtMs - nowMs) : null;
+    return (
+      <div className="tm-meter">
+        <div className="tm-meter-head">
+          <span className="tm-meter-title">🍚 {title}</span>
+          <span className="tm-meter-val">~{Math.round(win.usedPct)}% 먹음</span>
+        </div>
+        <div className={`tm-meter-track ${level}`}>
+          <div className={`tm-meter-fill ${level}`} style={{ width: `${Math.max(2, Math.min(100, win.usedPct))}%` }} />
+        </div>
+        <p className="tm-meter-sub">
+          새 {bowlNoun} 추정 게이지{countdown ? ` · ${countdown} 남음` : ""} — 상태줄 Claude 창이 응답을 받으면 실측으로 바뀌어요
+        </p>
+      </div>
+    );
+  }
+
   if (win.fresh) {
     return (
       <div className="tm-meter">
@@ -104,7 +124,7 @@ function coachLine(
   eating: boolean,
 ): string | null {
   if (!five) return null;
-  if (five.fresh)
+  if (five.fresh && !five.estimated)
     return eating ? "🍚 새 밥그릇 먹는 중 — 게이지는 곧 따라와요" : "🍚 새 밥그릇이 나왔어요 — 지금 먹는 게 제일 이득";
   if (five.usedPct >= 99.5) return "😴 완식! 소화 중 — 새 밥그릇을 기다려요";
   if (!fedToday && streakDays > 0) return `🔥 연속 ${streakDays}일이 오늘 끊길 위기 — 한 입만 먹여주세요`;

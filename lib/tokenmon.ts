@@ -128,6 +128,8 @@ export interface TokenmonRateWindow {
    * (5시간·주간 창은 첫 사용 시점에 시작되므로 리셋 직후엔 타이머가 없다.)
    */
   fresh?: boolean;
+  /** usedPct가 실측이 아니라 토큰 증가량 기반 추정치임. */
+  estimated?: boolean;
 }
 
 /** 프로젝트가 키우는 캐릭터 — 그 프로젝트의 모든 세션이 먹이를 준다. 종족·색은 프로젝트명 해시로 고정. */
@@ -165,6 +167,8 @@ export interface TokenmonState {
   sevenDay: TokenmonRateWindow | null;
   /** 이미 리셋된 직전 5시간 창에서 관측된 낭비율(0~100). 관측 불가면 null. */
   wastedFiveHourPct: number | null;
+  /** 직전 5시간 창의 리셋 시각(epoch ms) — 새 창 사용률 추정의 기준점. 관측 없으면 null. */
+  lastFiveHourResetAtMs: number | null;
   /** 연속 출석 일수 — 오늘 아직 안 썼어도 어제까지의 연속은 유지. */
   streakDays: number;
   /** 오늘 한 번이라도 사용했는지 — 스트릭 소멸 경고용. */
@@ -434,6 +438,7 @@ export function deriveTokenmonState(
     fiveHour,
     sevenDay,
     wastedFiveHourPct: expiredFive === null ? null : Math.max(0, Math.round(100 - expiredFive.usedPct)),
+    lastFiveHourResetAtMs: expiredFive === null ? null : expiredFive.resetsAtMs,
     streakDays,
     fedToday,
     starvingCount: pets.filter((pet) => pet.mood === "starving").length,
