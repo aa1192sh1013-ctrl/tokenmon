@@ -17,7 +17,7 @@ export default async function GalleryPage({ searchParams }: { searchParams: Prom
       <div className="tokenmon-standalone-inner">
         <TokenmonGallery lang={lang} />
         <p className="tm-standalone-foot">
-          <Link href="/">{lang === "ko" ? "← 내 토큰몬으로" : "← back to my Tokenmon"}</Link>
+          <Link href={`/?lang=${lang}`}>{lang === "ko" ? "← 내 토큰몬으로" : "← back to my Tokenmon"}</Link>
         </p>
       </div>
     </main>

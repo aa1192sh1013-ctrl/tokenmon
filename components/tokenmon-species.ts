@@ -3,7 +3,7 @@ import type { TokenmonColor, TokenmonLang, TokenmonSpecies } from "@/lib/tokenmo
 /**
  * 종 도감 — 60종 메카 동물(일러스트 스프라이트), 영어/한국어 이름·울음소리.
  * 스프라이트는 /public/species/<id>/<level>.webp (Lv.1~20, 레벨마다 다른 모습).
- * 색상은 원본 일러스트(은빛 메탈 + 시안 발광) 위에 CSS 필터로 입힌다.
+ * AnimalBot 고유 색상을 유지한다. 기존 색상 데이터는 저장 호환을 위해 남긴다.
  */
 
 interface SpeciesDef {
@@ -22,8 +22,8 @@ export const SPECIES_DEFS: Record<string, SpeciesDef> = {
   /* ---------- 흔한 종 50 ---------- */
   wolf: { label: { en: "WolfBot", ko: "늑대봇" }, cry: { en: "Awoo~", ko: "아우~" }, rare: false },
   fox: { label: { en: "FoxBot", ko: "여우봇" }, cry: { en: "Yip!", ko: "콘!" }, rare: false },
-  dog: { label: { en: "PupBot", ko: "멍멍봇" }, cry: { en: "Woof!", ko: "멍!" }, rare: false },
-  cat: { label: { en: "CatBot", ko: "냥냥봇" }, cry: { en: "Meow", ko: "냐옹" }, rare: false },
+  dog: { label: { en: "PupBot", ko: "강아지봇" }, cry: { en: "Woof!", ko: "멍!" }, rare: false },
+  cat: { label: { en: "CatBot", ko: "고양이봇" }, cry: { en: "Meow", ko: "냐옹" }, rare: false },
   lion: { label: { en: "LionBot", ko: "사자봇" }, cry: { en: "Roar!", ko: "어흥!" }, rare: false },
   tiger: { label: { en: "TigerBot", ko: "호랑이봇" }, cry: { en: "Grrar!", ko: "크앙!" }, rare: false },
   leopard: { label: { en: "LeopardBot", ko: "표범봇" }, cry: { en: "Prrrl", ko: "그르릉" }, rare: false },
@@ -40,7 +40,7 @@ export const SPECIES_DEFS: Record<string, SpeciesDef> = {
   gorilla: { label: { en: "GorillaBot", ko: "고릴라봇" }, cry: { en: "Ooh-ooh!", ko: "우호!" }, rare: false },
   monkey: { label: { en: "MonkeyBot", ko: "원숭이봇" }, cry: { en: "Ee-ee!", ko: "우끼!" }, rare: false },
   otter: { label: { en: "OtterBot", ko: "수달봇" }, cry: { en: "Nom nom", ko: "찹찹" }, rare: false },
-  raccoon: { label: { en: "RaccoonBot", ko: "너구리봇" }, cry: { en: "Rustle rustle", ko: "부스럭" }, rare: false },
+  raccoon: { label: { en: "RaccoonBot", ko: "라쿤봇" }, cry: { en: "Rustle rustle", ko: "부스럭" }, rare: false },
   kangaroo: { label: { en: "RooBot", ko: "캥거루봇" }, cry: { en: "Boing!", ko: "폴짝!" }, rare: false },
   bat: { label: { en: "BatBot", ko: "박쥐봇" }, cry: { en: "Screee", ko: "끼릭" }, rare: false },
   eagle: { label: { en: "EagleBot", ko: "독수리봇" }, cry: { en: "Screech!", ko: "끼요오!" }, rare: false },
@@ -49,13 +49,13 @@ export const SPECIES_DEFS: Record<string, SpeciesDef> = {
   falcon: { label: { en: "FalconBot", ko: "매봇" }, cry: { en: "Kree!", ko: "삐이익!" }, rare: false },
   penguin: { label: { en: "PenguinBot", ko: "펭귄봇" }, cry: { en: "Waddle waddle", ko: "뒤뚱" }, rare: false },
   peacock: { label: { en: "PeacockBot", ko: "공작봇" }, cry: { en: "Flourish~", ko: "촤르륵" }, rare: false },
-  parrot: { label: { en: "ParrotBot", ko: "앵무봇" }, cry: { en: "Hello!", ko: "안녕!" }, rare: false },
+  parrot: { label: { en: "ParrotBot", ko: "앵무새봇" }, cry: { en: "Hello!", ko: "안녕!" }, rare: false },
   crane: { label: { en: "CraneBot", ko: "두루미봇" }, cry: { en: "Kruu~", ko: "뚜루루" }, rare: false },
   crocodile: { label: { en: "CrocBot", ko: "악어봇" }, cry: { en: "Snap!", ko: "철컥!" }, rare: false },
   cobra: { label: { en: "CobraBot", ko: "코브라봇" }, cry: { en: "Sss...", ko: "스스슥" }, rare: false },
   chameleon: { label: { en: "ChamBot", ko: "카멜레온봇" }, cry: { en: "Slurp", ko: "늘름" }, rare: false },
-  turtle: { label: { en: "TurtleBot", ko: "거북봇" }, cry: { en: "Slow & steady~", ko: "느긋~" }, rare: false },
-  frog: { label: { en: "FrogBot", ko: "개굴봇" }, cry: { en: "Ribbit!", ko: "개굴!" }, rare: false },
+  turtle: { label: { en: "TurtleBot", ko: "거북이봇" }, cry: { en: "Slow & steady~", ko: "느긋~" }, rare: false },
+  frog: { label: { en: "FrogBot", ko: "개구리봇" }, cry: { en: "Ribbit!", ko: "개굴!" }, rare: false },
   shark: { label: { en: "SharkBot", ko: "상어봇" }, cry: { en: "Swoosh!", ko: "슈욱!" }, rare: false },
   orca: { label: { en: "OrcaBot", ko: "범고래봇" }, cry: { en: "Splash!", ko: "촤아!" }, rare: false },
   dolphin: { label: { en: "DolphinBot", ko: "돌고래봇" }, cry: { en: "Click-click", ko: "끼익끼익" }, rare: false },
@@ -71,14 +71,14 @@ export const SPECIES_DEFS: Record<string, SpeciesDef> = {
   spider: { label: { en: "SpiderBot", ko: "거미봇" }, cry: { en: "Skitter skitter", ko: "스륵스륵" }, rare: false },
   butterfly: { label: { en: "FlutterBot", ko: "나비봇" }, cry: { en: "Flutter flutter", ko: "팔랑팔랑" }, rare: false },
   /* ---------- 공룡류 (RARE) ---------- */
-  tyranno: { label: { en: "TyrannoBot", ko: "티라노봇" }, cry: { en: "RAWR!", ko: "크르르릉!" }, rare: true },
-  tricera: { label: { en: "TriceraBot", ko: "트리케라봇" }, cry: { en: "Rumble rumble", ko: "두두둥" }, rare: true },
-  raptor: { label: { en: "RaptorBot", ko: "랩터봇" }, cry: { en: "Screee!", ko: "캬악!" }, rare: true },
-  anky: { label: { en: "AnkyloBot", ko: "안킬로봇" }, cry: { en: "Clang!", ko: "텅텅!" }, rare: true },
-  ptera: { label: { en: "PteraBot", ko: "프테라봇" }, cry: { en: "Skreek!", ko: "키에엑!" }, rare: true },
+  tyranno: { label: { en: "TyrannoBot", ko: "티라노사우루스봇" }, cry: { en: "RAWR!", ko: "크르르릉!" }, rare: true },
+  tricera: { label: { en: "TriceraBot", ko: "트리케라톱스봇" }, cry: { en: "Rumble rumble", ko: "두두둥" }, rare: true },
+  raptor: { label: { en: "RaptorBot", ko: "벨로시랩터봇" }, cry: { en: "Screee!", ko: "캬악!" }, rare: true },
+  anky: { label: { en: "AnkyloBot", ko: "안킬로사우루스봇" }, cry: { en: "Clang!", ko: "텅텅!" }, rare: true },
+  ptera: { label: { en: "PteraBot", ko: "프테라노돈봇" }, cry: { en: "Skreek!", ko: "키에엑!" }, rare: true },
   /* ---------- 환수종 (RARE) ---------- */
   dragon: { label: { en: "DragonBot", ko: "드래곤봇" }, cry: { en: "Fwoosh!", ko: "화르륵!" }, rare: true },
-  phoenix: { label: { en: "PhoenixBot", ko: "불사조봇" }, cry: { en: "Flare!", ko: "파아앗!" }, rare: true },
+  phoenix: { label: { en: "PhoenixBot", ko: "피닉스봇" }, cry: { en: "Flare!", ko: "파아앗!" }, rare: true },
   griffin: { label: { en: "GriffinBot", ko: "그리핀봇" }, cry: { en: "Kreee!", ko: "키이잉!" }, rare: true },
   qilin: { label: { en: "QilinBot", ko: "키린봇" }, cry: { en: "Ting-a-ling~", ko: "딸랑~" }, rare: true },
   cerberus: { label: { en: "CerberusBot", ko: "케르베로스봇" }, cry: { en: "Woof! Woof! Woof!", ko: "왈!왈!왈!" }, rare: true },

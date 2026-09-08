@@ -2,20 +2,22 @@
   "name": "tokenmon",
   "version": "0.1.0",
   "private": true,
-  "description": "A tamagotchi for your Claude Code usage — every project hatches a mecha critter (60 illustrated species, 20 evolution stages) that grows as you burn tokens, with live rate-limit bowls and streaks. Local-only.",
+  "description": "Claude Code + Codex usage companions with 60 AnimalBot species and local project growth.",
   "license": "MIT",
   "author": "Sunhong Min",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "dev": "next dev -p 4242",
+    "dev": "next dev -H 127.0.0.1 -p 4242",
     "build": "next build",
-    "start": "next start -p 4242",
+    "start": "next start -H 127.0.0.1 -p 4242",
     "typecheck": "tsc --noEmit",
     "setup": "node scripts/setup.js",
     "backfill": "node scripts/backfill.js",
-    "remove": "node scripts/setup.js --uninstall"
+    "remove": "node scripts/setup.js --uninstall",
+    "test": "tsx --test tests/*.test.ts",
+    "assets:import": "node scripts/import-animalbot.mjs"
   },
   "dependencies": {
     "next": "^16.3.4",
@@ -26,6 +28,8 @@
     "@types/node": "^26.4.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
+    "sharp": "^0.35.4",
+    "tsx": "^4.23.13",
     "typescript": "^7.0.2"
   }
 }

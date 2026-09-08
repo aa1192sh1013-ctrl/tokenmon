@@ -1,67 +1,47 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { TokenmonPet } from "../lib/tokenmon";
+import { CLAUDE_DIR, DATA_DIR, readJson, writeJson } from "../lib/local-data";
 
-/**
- * 프로젝트 최초 감지 레지스트리 — 캐릭터는 "처음 손댄 순간"의 누적 사용량을
- * 0점(기준선)으로 삼고, 그 이후 증가분만 XP로 먹는다.
- *
- * 저장: ~/.claude/tokenmon/projects.json
- *   { "<프로젝트명>": { "firstSeenAt": ISO, "baselineTokens": number } }
- * 파일을 지우면 모든 캐릭터가 그 순간부터 Lv.1로 다시 시작한다.
- */
+interface RecordV2 { firstSeenAt: string; claudeBaseline?: number; codexGrowthAtHatch: number }
+interface Registry { version: 2; projects: Record<string, RecordV2> }
+const FILE = join(DATA_DIR, "projects.json");
 
-const DIR = join(homedir(), ".claude", "tokenmon");
-const FILE = join(DIR, "projects.json");
-
-interface ProjectRecord {
-  firstSeenAt: string;
-  baselineTokens: number;
+/** Read legacy baselines without changing them. Split name collisions proportionally. */
+export function migrateLegacyBaselines(pets: TokenmonPet[], legacy: Record<string, { baselineTokens: number }>) {
+  const totals = new Map<string, number>();
+  for (const p of pets) totals.set(p.projectName, (totals.get(p.projectName) || 0) + (p.providerTokens?.claude || 0));
+  return Object.fromEntries(pets.map(p => {
+    const claude = p.providerTokens?.claude || 0;
+    const total = totals.get(p.projectName) || 0;
+    const old = legacy[p.projectName];
+    return [p.projectId || p.projectName, old && total ? Math.max(0, old.baselineTokens) * claude / total : claude];
+  }));
 }
 
-function load(): Record<string, ProjectRecord> {
-  try {
-    const parsed = JSON.parse(readFileSync(FILE, "utf8")) as Record<string, Partial<ProjectRecord>>;
-    const out: Record<string, ProjectRecord> = {};
-    for (const [name, record] of Object.entries(parsed)) {
-      if (record && typeof record.firstSeenAt === "string" && typeof record.baselineTokens === "number") {
-        out[name] = { firstSeenAt: record.firstSeenAt, baselineTokens: record.baselineTokens };
-      }
-    }
-    return out;
-  } catch {
-    return {};
-  }
-}
-
-/**
- * 새로 감지된 프로젝트를 현재 누적치로 등록하고,
- * 파생 계산에 쓸 { 프로젝트명: 기준선 토큰 } 맵을 돌려준다.
- */
-export function syncProjectRegistry(pets: { projectName: string; totalTokens: number }[]): Record<string, number> {
-  const registry = load();
+export function syncProjectRegistry(pets: TokenmonPet[]): Record<string, number> {
+  // A malformed existing ledger must never silently reset growth.
+  const registry: Registry = existsSync(FILE) ? JSON.parse(readFileSync(FILE, "utf8")) : { version: 2, projects: {} };
+  if (registry.version !== 2 || !registry.projects) throw new Error("Unsupported Tokenmon project ledger");
+  const legacy = readJson<Record<string, { baselineTokens: number; firstSeenAt: string }>>(join(CLAUDE_DIR, "projects.json"), {});
+  const migrated = migrateLegacyBaselines(pets, legacy);
+  const result: Record<string, number> = {};
   let dirty = false;
-  for (const pet of pets) {
-    if (!registry[pet.projectName]) {
-      registry[pet.projectName] = { firstSeenAt: new Date().toISOString(), baselineTokens: pet.totalTokens };
+  for (const p of pets) {
+    const id = p.projectId || p.projectName;
+    const claude = p.providerTokens?.claude || 0;
+    const codex = p.providerTokens?.codex || 0;
+    const growth = p.codexGrowth || 0;
+    let record = registry.projects[id];
+    if (!record) {
+      record = registry.projects[id] = { firstSeenAt: legacy[p.projectName]?.firstSeenAt || new Date().toISOString(), codexGrowthAtHatch: growth };
+      if (claude > 0) record.claudeBaseline = migrated[id];
       dirty = true;
     }
+    if (record.claudeBaseline === undefined && claude > 0) { record.claudeBaseline = migrated[id]; dirty = true; }
+    // Historical Codex sessions discovered later do not produce a sudden XP jump.
+    result[id] = (record.claudeBaseline || 0) + codex - Math.max(0, growth - record.codexGrowthAtHatch);
   }
-  if (dirty) {
-    try {
-      mkdirSync(DIR, { recursive: true });
-      const tmp = `${FILE}.${process.pid}.tmp`;
-      writeFileSync(tmp, JSON.stringify(registry, null, 2));
-      try {
-        renameSync(tmp, FILE);
-      } catch {
-        writeFileSync(FILE, JSON.stringify(registry, null, 2));
-      }
-    } catch {
-      /* 저장 실패 시 다음 폴링에서 재시도 */
-    }
-  }
-  const baselines: Record<string, number> = {};
-  for (const [name, record] of Object.entries(registry)) baselines[name] = record.baselineTokens;
-  return baselines;
+  if (dirty) writeJson(FILE, registry);
+  return result;
 }

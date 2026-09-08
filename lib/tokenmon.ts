@@ -16,7 +16,13 @@ export interface TokenmonRateWindowPayload {
   resets_at?: number | null;
 }
 
+export type UsageProvider = "claude" | "codex";
 export interface TokenmonPayload {
+  provider?: UsageProvider;
+  project_id?: string;
+  project_name?: string;
+  history_only?: boolean;
+  growth_tokens?: number;
   session_id?: string;
   cwd?: string;
   model?: { id?: string; display_name?: string | null } | null;
@@ -94,6 +100,10 @@ export function colorOf(projectName: string): TokenmonColor {
 }
 
 export interface TokenmonSession {
+  provider: UsageProvider;
+  projectId: string;
+  historyOnly: boolean;
+  growthTokens: number;
   id: string;
   projectName: string;
   model: string;
@@ -136,10 +146,13 @@ export interface TokenmonRateWindow {
 
 /** 프로젝트가 키우는 캐릭터 — 그 프로젝트의 모든 세션이 먹이를 준다. 종족·색은 프로젝트명 해시로 고정. */
 export interface TokenmonPet {
+  projectId?: string;
+  providerTokens?: Partial<Record<UsageProvider, number>>;
+  codexGrowth?: number;
   projectName: string;
   species: TokenmonSpecies;
   color: TokenmonColor;
-  /** 1~20. Lv.1은 아직 알. */
+  /** 1~20. Lv.1은 갓 부화한 아기. 알(Lv.0)은 도감 미리보기 전용. */
   level: number;
   maxLevel: boolean;
   xp: number;
@@ -162,6 +175,7 @@ export interface TokenmonPet {
 export interface TokenmonState {
   /** true면 실제 수집 데이터, false면 미리보기(mock) 데이터. */
   live: boolean;
+  providerTotals: Record<UsageProvider, { inputTokens: number; outputTokens: number; sessions: number }>;
   /** 최신순 정렬. */
   sessions: TokenmonSession[];
   /** 세션별 캐릭터 — 깨어 있는 순 → 최신순. */
@@ -236,8 +250,12 @@ function toSession(snapshot: TokenmonSnapshot): TokenmonSession {
   const { payload } = snapshot;
   return {
     id: payload.session_id ?? "unknown",
+    provider: payload.provider ?? "claude",
+    growthTokens: num(payload.growth_tokens) ?? 0,
+    projectId: payload.project_id ?? normalizeDir(payload.workspace?.project_dir ?? payload.workspace?.current_dir ?? payload.cwd ?? payload.session_id ?? "unknown"),
+    historyOnly: payload.history_only === true || isBackfillSession(payload.session_id ?? ""),
     projectName:
-      basename(payload.workspace?.project_dir) ?? basename(payload.workspace?.current_dir) ?? basename(payload.cwd) ?? "unknown-project",
+      payload.project_name ?? basename(payload.workspace?.project_dir) ?? basename(payload.workspace?.current_dir) ?? basename(payload.cwd) ?? "unknown-project",
     model: payload.model?.display_name ?? payload.model?.id ?? "Claude",
     savedAt: snapshot.savedAt,
     inputTokens: num(payload.context_window?.total_input_tokens) ?? 0,
@@ -260,7 +278,8 @@ function localDayKey(date: Date): string {
 
 /** 경로 비교용 정규화 — 윈도우 경로는 대소문자·구분자 차이를 무시한다. */
 function normalizeDir(dir: string): string {
-  return dir.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+  const normalized = dir.replace(/\\/g, "/").replace(/\/+$/, "");
+  return /^[a-z]:/i.test(normalized) || normalized.startsWith("//") ? normalized.toLowerCase() : normalized;
 }
 
 /** "vibesquad-plan-*" 같은 와일드카드(*) 패턴 매칭 — 대소문자 무시. */
@@ -358,15 +377,16 @@ export function deriveTokenmonState(
     .slice()
     .sort((a, b) => Date.parse(b.savedAt) - Date.parse(a.savedAt));
   const allSessions = sorted.map(toSession);
-  const liveSessions = allSessions.filter((session) => !isBackfillSession(session.id));
+  const liveSessions = allSessions.filter((session) => !session.historyOnly);
+  const claudeSnapshots = sorted.filter((s) => s.payload.provider !== "codex");
 
   // 유효한 창이 없어도 직전 창의 만료를 관측했다면 "새 밥그릇(0%)"으로 초기화해서 보여준다.
-  const expiredFive = lastExpiredWindow(sorted, "five_hour", nowMs);
-  const expiredSeven = lastExpiredWindow(sorted, "seven_day", nowMs);
+  const expiredFive = lastExpiredWindow(claudeSnapshots, "five_hour", nowMs);
+  const expiredSeven = lastExpiredWindow(claudeSnapshots, "seven_day", nowMs);
   const fiveHour =
-    bestRateWindow(sorted, "five_hour", nowMs) ?? (expiredFive ? { usedPct: 0, resetsAtMs: null, fresh: true } : null);
+    bestRateWindow(claudeSnapshots, "five_hour", nowMs) ?? (expiredFive ? { usedPct: 0, resetsAtMs: null, fresh: true } : null);
   const sevenDay =
-    bestRateWindow(sorted, "seven_day", nowMs) ?? (expiredSeven ? { usedPct: 0, resetsAtMs: null, fresh: true } : null);
+    bestRateWindow(claudeSnapshots, "seven_day", nowMs) ?? (expiredSeven ? { usedPct: 0, resetsAtMs: null, fresh: true } : null);
 
   const ignoredDirs = new Set((options.ignoreProjectDirs ?? []).map(normalizeDir));
   const ignoredPrefixes = (options.ignoreProjectDirPrefixes ?? []).map(normalizeDir);
@@ -375,23 +395,26 @@ export function deriveTokenmonState(
   for (const session of allSessions) {
     // 캐릭터는 라이브로 감지된 시점부터 Lv.1로 시작한다 — 설치 전 기록(백필)은
     // 현황판 합계에만 들어가고, 성장에는 넣지 않는다.
-    if (isBackfillSession(session.id)) continue;
+    if (session.historyOnly) continue;
     // 잡폴더 세션은 캐릭터를 만들지 않는다 (사용량 집계에는 포함)
     const dir = normalizeDir(session.projectDir);
     if (ignoredDirs.has(dir)) continue;
     if (ignoredPrefixes.some((prefix) => dir === prefix || dir.startsWith(`${prefix}/`))) continue;
     if (ignoredNames.length > 0 && matchesAnyPattern(session.projectName, ignoredNames)) continue;
-    const group = byProject.get(session.projectName);
+    const group = byProject.get(session.projectId);
     if (group) group.push(session);
-    else byProject.set(session.projectName, [session]);
+    else byProject.set(session.projectId, [session]);
   }
 
   const pets: TokenmonPet[] = [...byProject.entries()]
-    .map(([projectName, group]) => {
+    .map(([projectId, group]) => {
+      const projectName = group[0].projectName;
+      const providerTokens = { claude: 0, codex: 0 };
+      for (const session of group) providerTokens[session.provider] += session.inputTokens + session.outputTokens;
       const totalTokens = group.reduce((sum, session) => sum + session.inputTokens + session.outputTokens, 0);
       // 최초 감지 순간의 누적치가 0점 — 캐릭터는 그 이후 증가분만 먹고 자란다.
-      const rawXp = Math.max(0, totalTokens - (options.baselines?.[projectName] ?? 0)) / 1_000_000;
-      const liveGroup = group.filter((session) => !isBackfillSession(session.id));
+      const rawXp = Math.max(0, totalTokens - (options.baselines?.[projectId] ?? 0)) / 1_000_000;
+      const liveGroup = group.filter((session) => !session.historyOnly);
       const lastSeenMs = Math.max(...group.map((session) => Date.parse(session.savedAt)));
       const active = liveGroup.some((session) => nowMs - Date.parse(session.savedAt) <= ACTIVE_WINDOW_MS);
 
@@ -407,6 +430,9 @@ export function deriveTokenmonState(
       const current = LEVEL_XP[level];
       const next = level >= MAX_LEVEL ? null : LEVEL_XP[level + 1];
       return {
+        projectId,
+        providerTokens,
+        codexGrowth: group.reduce((sum, session) => sum + session.growthTokens, 0),
         projectName,
         species: speciesOf(projectName),
         color: colorOf(projectName),
@@ -447,11 +473,19 @@ export function deriveTokenmonState(
     inputTokens: allSessions.reduce((sum, session) => sum + session.inputTokens, 0),
     outputTokens: allSessions.reduce((sum, session) => sum + session.outputTokens, 0),
     costUsd: Number(allSessions.reduce((sum, session) => sum + (session.costUsd ?? 0), 0).toFixed(2)),
-    sessionCount: liveSessions.length + allSessions.reduce((sum, session) => sum + session.historySessions, 0),
+    sessionCount: allSessions.reduce((sum, session) => sum + (session.historySessions || 1), 0),
     activeDays: dayKeys.size,
   };
 
+  const providerTotals = { claude: { inputTokens: 0, outputTokens: 0, sessions: 0 }, codex: { inputTokens: 0, outputTokens: 0, sessions: 0 } };
+  for (const session of allSessions) {
+    const total = providerTotals[session.provider];
+    total.inputTokens += session.inputTokens;
+    total.outputTokens += session.outputTokens;
+    total.sessions += session.historySessions || 1;
+  }
   return {
+    providerTotals,
     live: options.live,
     sessions: liveSessions,
     pets,
@@ -475,6 +509,7 @@ export type TokenmonLang = "en" | "ko";
 
 export function formatTokenCount(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return "0";
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2).replace(/\.?0+$/, "")}B`;
   if (value < 1000) return String(Math.round(value));
   if (value < 1_000_000) return `${(value / 1000).toFixed(1).replace(/\.0$/, "")}k`;
   return `${(value / 1_000_000).toFixed(2).replace(/\.?0+$/, "")}M`;

@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Tokenmon",
-  description: "Claude Code 토큰 다마고치 — 실시간 사용량과 함께 자라는 픽셀 펫",
+  description: "Claude Code와 Codex 사용량으로 키우는 AnimalBot 동물봇",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

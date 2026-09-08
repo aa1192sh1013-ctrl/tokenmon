@@ -110,12 +110,12 @@ function Meter({
       <div className="tm-meter">
         <div className="tm-meter-head">
           <span className="tm-meter-title">🍚 {title}</span>
-          <span className="tm-meter-val">{eating ? text.freshEating : text.freshZero}</span>
+          <span className="tm-meter-val">—</span>
         </div>
         <div className="tm-meter-track good">
-          <div className="tm-meter-fill good" style={{ width: eating ? "6%" : 0 }} />
+          <div className="tm-meter-fill good" style={{ width: 0 }} />
         </div>
-        <p className="tm-meter-sub">{eating ? text.freshEatingSub(bowlNoun) : text.freshZeroSub(bowlNoun)}</p>
+        <p className="tm-meter-sub">{lang === "ko" ? "이전 구간 만료 · 현재 사용률 갱신 대기" : "Previous window expired · awaiting current usage"}</p>
       </div>
     );
   }
@@ -178,7 +178,7 @@ function coachLine(
 ): string | null {
   const text = COACH_TEXT[lang];
   if (!five) return null;
-  if (five.fresh && !five.estimated) return eating ? text.freshEating : text.fresh;
+  if (five.fresh && !five.estimated) return null;
   if (five.usedPct >= 99.5) return text.digesting;
   if (!fedToday && streakDays > 0) return text.streakRisk(streakDays);
   const remainPct = Math.round(100 - five.usedPct);
@@ -189,9 +189,9 @@ function coachLine(
 
 const PANEL_TEXT = {
   en: {
-    fiveTitle: "This bowl · 5h",
+    fiveTitle: "Claude · 5h",
     fiveNoun: "bowl",
-    weekTitle: "This week's feeder · 7d",
+    weekTitle: "Claude · 7d",
     weekNoun: "feeder",
     tokens: "tokens collected (output)",
     streak: "daily streak",
@@ -204,9 +204,9 @@ const PANEL_TEXT = {
     lastSeen: (duration: string) => `last activity ${duration} ago`,
   },
   ko: {
-    fiveTitle: "이번 밥그릇 · 5시간",
+    fiveTitle: "Claude 밥그릇 · 5시간",
     fiveNoun: "밥그릇",
-    weekTitle: "이번 주 밥통 · 주간",
+    weekTitle: "Claude 밥통 · 주간",
     weekNoun: "밥통",
     tokens: "모은 토큰 (출력)",
     streak: "연속 출석",
@@ -220,11 +220,26 @@ const PANEL_TEXT = {
   },
 } as const;
 
+export function ClaudeUsageLimits({ fiveHour, sevenDay, nowMs, lang }: {
+  fiveHour: TokenmonRateWindow | null;
+  sevenDay: TokenmonRateWindow | null;
+  nowMs: number | null;
+  lang: TokenmonLang;
+}) {
+  const text = PANEL_TEXT[lang];
+  return <div className="tm-claude-limits">
+    <h3>{lang === "ko" ? "Claude Code 사용 한도" : "Claude Code usage limits"}</h3>
+    <p>{lang === "ko" ? "계정 조회 또는 Claude 상태줄에서 받은 값 · 추정치는 ~로 표시" : "From account lookup or the Claude status line · estimates marked ~"}</p>
+    <Meter title={text.fiveTitle} bowlNoun={text.fiveNoun} window={fiveHour} nowMs={nowMs} eating={false} lang={lang} />
+    <Meter title={text.weekTitle} bowlNoun={text.weekNoun} window={sevenDay} nowMs={nowMs} eating={false} lang={lang} />
+  </div>;
+}
+
 export function TokenmonMeters({
   fiveHour,
-  sevenDay,
   totals,
   lastActivityAt,
+  claudeLastActivityAt,
   streakDays,
   fedToday,
   wastedFiveHourPct,
@@ -232,9 +247,9 @@ export function TokenmonMeters({
   lang = "en",
 }: {
   fiveHour: TokenmonRateWindow | null;
-  sevenDay: TokenmonRateWindow | null;
   totals: TokenmonState["totals"];
   lastActivityAt: string | null;
+  claudeLastActivityAt: string | null;
   streakDays: number;
   fedToday: boolean;
   wastedFiveHourPct: number | null;
@@ -253,13 +268,11 @@ export function TokenmonMeters({
 
   const sinceMs = lastActivityAt !== null && nowMs !== null ? Math.max(0, nowMs - Date.parse(lastActivityAt)) : null;
   const lastSeen = sinceMs === null ? null : sinceMs < 60_000 ? text.lastSeenNow : text.lastSeen(formatDuration(sinceMs, lang));
-  const eating = sinceMs !== null && sinceMs < 30 * 60_000;
+  const eating = claudeLastActivityAt !== null && nowMs !== null && nowMs - Date.parse(claudeLastActivityAt) < 30 * 60_000;
   const coach = coachLine(fiveHour, streakDays, fedToday, eating, lang);
 
   return (
     <div className="tm-status-col">
-      <Meter title={text.fiveTitle} bowlNoun={text.fiveNoun} window={fiveHour} nowMs={nowMs} eating={eating} lang={lang} />
-      <Meter title={text.weekTitle} bowlNoun={text.weekNoun} window={sevenDay} nowMs={nowMs} eating={eating} lang={lang} />
       <div className="tm-stats">
         <div className="tm-stat">
           <span className="metric-label">{text.tokens}</span>

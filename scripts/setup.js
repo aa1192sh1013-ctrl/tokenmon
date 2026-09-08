@@ -76,7 +76,7 @@ function install() {
   console.log(`✓ Collector installed → ${COLLECTOR_DEST}`);
 
   const settings = readSettings();
-  const desiredCommand = `node ${forwardSlashes(COLLECTOR_DEST)}`;
+  const desiredCommand = `node "${forwardSlashes(COLLECTOR_DEST)}"`;
   const existing = settings.statusLine;
 
   const backup = backupSettings();

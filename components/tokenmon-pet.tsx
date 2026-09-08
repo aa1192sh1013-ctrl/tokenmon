@@ -45,7 +45,7 @@ const CARD_TEXT = {
 
 /** 레벨마다 몸집이 조금씩 자란다. (정사각 캔버스 여백을 감안해 넉넉하게) */
 function spriteSize(level: number): number {
-  return Math.round(Math.min(168, 100 + level * 3.4));
+  return Math.round(Math.min(224, 154 + level * 3.5));
 }
 
 /* ---------- 프로젝트 캐릭터 카드 ---------- */
@@ -112,6 +112,10 @@ export function TokenmonPetCard({ pet, lang = "en" }: { pet: TokenmonPet; lang?:
       <p className="tm-card-sub">
         {projectName} · {text.sessions(pet.sessionCount)}
       </p>
+      {pet.providerTokens && <p className="tm-provider-contribution">
+        {Object.entries(pet.providerTokens).filter(([, value]) => value > 0).map(([provider, value]) =>
+          <span key={provider}>{provider === "codex" ? "Codex" : "Claude"} {formatTokenCount(value)}</span>)}
+      </p>}
       <div className="tm-xp">
         <div className="tm-xp-track">
           <div className="tm-xp-fill" style={{ width: `${pet.levelProgressPct}%` }} />

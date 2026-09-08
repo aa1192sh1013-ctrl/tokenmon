@@ -77,7 +77,7 @@ export function TokenmonChart({ sessions, lang = "en" }: { sessions: TokenmonSes
             >
               <div className="tm-bar-meta">
                 <strong>{session.projectName}</strong>
-                {modelName(session.model)} · {formatDayTime(session.savedAt, lang)}
+                {session.provider === "codex" ? "Codex" : "Claude"} · {modelName(session.model)} · {formatDayTime(session.savedAt, lang)}
               </div>
               <div className="tm-bar-slot">
                 <div className="tm-bar-track" style={{ width: `${Math.max(widthPct, 2)}%` }}>

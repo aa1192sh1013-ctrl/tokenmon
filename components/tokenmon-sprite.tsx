@@ -1,15 +1,14 @@
 "use client";
 
 import { MAX_LEVEL, type TokenmonColor, type TokenmonLang, type TokenmonSpecies } from "@/lib/tokenmon";
-import { getColorInfo, getSpeciesInfo, SPECIES_DEFS } from "./tokenmon-species";
+import { getSpeciesInfo, SPECIES_DEFS } from "./tokenmon-species";
 
 /**
  * 캐릭터 스프라이트 — 종/레벨별 일러스트(/species/<id>/<level>.webp)에
- * 색상 필터를 입혀 보여준다. 원본은 은빛 메탈 + 시안 발광 기준.
+ * AnimalBot 원화의 고유 색상과 투명 오라를 유지한다.
  */
 export function PetSprite({
   species,
-  color,
   level,
   size,
   label,
@@ -25,11 +24,10 @@ export function PetSprite({
   dim?: boolean;
   lang?: TokenmonLang;
 }) {
-  const safeLevel = Math.max(1, Math.min(MAX_LEVEL, Math.round(level)));
+  const safeLevel = Math.max(0, Math.min(MAX_LEVEL, Math.round(level)));
   const info = getSpeciesInfo(species, lang);
-  const colorInfo = getColorInfo(color, lang);
   const id = species in SPECIES_DEFS ? species : "dog";
-  const SPRITE_V = 4; // 스프라이트 교체 시 올려서 브라우저 캐시 무효화
+  const SPRITE_V = "animalbot-20260908"; // 스프라이트 교체 시 올려서 브라우저 캐시 무효화
   return (
     <span className={`tm-sprite-frame ${dim ? "dim" : ""}`} style={{ width: size, height: size }} role="img" aria-label={label}>
       {/* eslint-disable-next-line @next/next/no-img-element -- 로컬 정적 스프라이트, 최적화 불필요 */}
@@ -40,8 +38,7 @@ export function PetSprite({
         height={size}
         loading="lazy"
         draggable={false}
-        style={{ filter: colorInfo.filter }}
-        title={`${info.label} · ${colorInfo.label}`}
+        title={`${info.label} · Lv.${safeLevel}`}
       />
     </span>
   );

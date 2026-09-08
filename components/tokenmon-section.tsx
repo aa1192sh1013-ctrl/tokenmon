@@ -1,3 +1,6 @@
+import { readCodexUsage } from "@/lib/codex-collector";
+import { projectIdentity } from "@/lib/project-identity";
+import { DATA_DIR, readJson } from "@/lib/local-data";
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
@@ -34,7 +37,7 @@ function ensureBackfillOnce(): void {
   try {
     mkdirSync(join(homedir(), ".claude", "tokenmon"), { recursive: true });
     writeFileSync(metaFile, JSON.stringify({ autoBackfillAt: new Date().toISOString() }));
-    spawn(process.execPath, [script], { detached: true, stdio: "ignore" }).unref();
+    spawn(process.execPath, [script], { detached: true, stdio: "ignore", windowsHide: true }).unref();
   } catch {
     /* 실패해도 대시보드는 라이브 수집만으로 동작한다 */
   }
@@ -86,7 +89,7 @@ export async function TokenmonSection({ langOverride }: { langOverride?: string 
   );
   const tailed = await readActiveTranscriptSnapshots(statuslineIds);
   const tailedIds = new Set(tailed.map((snapshot) => snapshot.payload.session_id));
-  const real = [
+  const claude = [
     ...persisted.filter((snapshot) => {
       const id = snapshot.payload.session_id ?? "";
       if (tailedIds.has(id)) return false; // 방금 테일링한 최신본이 대신 들어간다
@@ -96,6 +99,16 @@ export async function TokenmonSection({ langOverride }: { langOverride?: string 
     }),
     ...tailed,
   ];
+  const codex = readCodexUsage();
+  const config = readJson<{ projectAliases?: Record<string, string> }>(join(DATA_DIR, "config.json"), {});
+  const identities = new Map<string, ReturnType<typeof projectIdentity>>();
+  const real = [...claude, ...codex.snapshots].map(snapshot => {
+    const p = snapshot.payload;
+    const cwd = p.workspace?.project_dir || p.workspace?.current_dir || p.cwd || "unknown-project";
+    let identity = identities.get(cwd);
+    if (!identity) { identity = projectIdentity(cwd, config.projectAliases); identities.set(cwd, identity); }
+    return { ...snapshot, payload: { ...p, project_id: identity.id, project_name: identity.name } };
+  });
   const live = real.length > 0;
   const deriveOptions = {
     live,
@@ -113,9 +126,9 @@ export async function TokenmonSection({ langOverride }: { langOverride?: string 
 
   // 밥그릇 게이지 — 1순위: 사용량 API 직접 조회(데스크탑 앱과 같은 값),
   // 폴백: statusline 관측, 최후: 대화 로그 기반 추정.
-  if (live) {
+  if (claude.length > 0) {
     const nowMs = Date.now();
-    const grandTotal = state.totals.inputTokens + state.totals.outputTokens;
+    const grandTotal = state.providerTotals.claude.inputTokens + state.providerTotals.claude.outputTokens;
     const apiUsage = await fetchApiUsage();
     if (apiUsage) {
       state.fiveHour = apiUsage.fiveHour;
@@ -125,8 +138,8 @@ export async function TokenmonSection({ langOverride }: { langOverride?: string 
     if (!apiUsage && state.fiveHour?.fresh && state.lastFiveHourResetAtMs !== null) {
       const expiredUsedPct = 100 - (state.wastedFiveHourPct ?? 100);
       const estimate = await estimateFreshFiveHour(nowMs, grandTotal, state.lastFiveHourResetAtMs, expiredUsedPct);
-      if (estimate) state.fiveHour = { ...estimate, fresh: true, estimated: true };
+      if (estimate && estimate.resetsAtMs !== null && estimate.resetsAtMs > nowMs) state.fiveHour = { ...estimate, fresh: true, estimated: true };
     }
   }
-  return <TokenmonPanel state={state} lang={await detectLang(langOverride)} />;
+  return <TokenmonPanel state={state} lang={await detectLang(langOverride)} codexQuotas={codex.quotas} codexStatus={codex.status} />;
 }

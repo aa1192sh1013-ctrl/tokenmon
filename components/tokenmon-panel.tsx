@@ -1,8 +1,10 @@
 "use client";
 
+import type { CodexQuota, CodexStatus } from "@/lib/codex-collector";
+import { ProviderOverview } from "./provider-overview";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { TokenmonLang, TokenmonState } from "@/lib/tokenmon";
 import { TokenmonChart } from "./tokenmon-chart";
 import { TokenmonMeters } from "./tokenmon-meters";
@@ -13,32 +15,33 @@ const MAX_PETS = 12;
 
 const TEXT = {
   en: {
-    sub: "the Claude Code token tamagotchi",
+    sub: "Claude Code + Codex companions",
     live: "live",
     preview: "preview data · waiting for hookup",
     rosterTitle: "Project critters",
     rosterCount: (pets: number, awake: number) => `${pets} critters · ${awake} awake · `,
     dex: "dex",
-    empty: "No critters hatched yet. Work on any project with Claude Code and one will be born.",
+    empty: "No critters hatched yet. Work on any project with Claude Code or Codex and one will be born.",
     resting: (n: number) => `${n} resting critters are tucked away.`,
-    note: "No data collected yet. Run `npm run setup` to install the collector, then do anything in a new Claude Code session and this switches to live data.",
-    aria: "Tokenmon — Claude Code usage",
+    note: "Open a local Codex task or run npm run setup for Claude Code. Your first companion starts growing after it is discovered.",
+    aria: "Tokenmon — Claude Code + Codex usage",
   },
   ko: {
-    sub: "Claude Code 토큰 다마고치",
+    sub: "Claude Code + Codex 통합 동물봇",
     live: "실시간 연동",
     preview: "미리보기 데이터 · 연동 대기",
     rosterTitle: "프로젝트 캐릭터",
     rosterCount: (pets: number, awake: number) => `${pets}마리 · 깨어 있음 ${awake}마리 · `,
     dex: "도감",
-    empty: "아직 부화한 캐릭터가 없어요. Claude Code로 아무 프로젝트나 작업하면 캐릭터가 태어납니다.",
+    empty: "아직 부화한 캐릭터가 없어요. Claude Code 또는 Codex로 아무 프로젝트나 작업하면 캐릭터가 태어납니다.",
     resting: (n: number) => `쉬고 있는 캐릭터 ${n}마리는 접혀 있어요.`,
-    note: "아직 수집된 데이터가 없어요. npm run setup 으로 수집기를 설치한 뒤, 새 Claude Code 세션에서 아무 작업이나 한 번 하면 자동으로 실시간 데이터로 바뀝니다.",
-    aria: "Tokenmon — Claude Code 사용량",
+    note: "로컬 Codex 작업을 시작하거나 Claude Code에서 npm run setup으로 수집기를 연결하세요. 처음 감지된 이후 사용량으로 캐릭터가 성장합니다.",
+    aria: "Tokenmon — Claude Code + Codex 사용량",
   },
 } as const;
 
-export function TokenmonPanel({ state, lang = "en" }: { state: TokenmonState; lang?: TokenmonLang }) {
+export function TokenmonPanel({ state, lang = "en", codexQuotas = [], codexStatus }: { state: TokenmonState; lang?: TokenmonLang; codexQuotas?: CodexQuota[]; codexStatus?: CodexStatus }) {
+  const [showAll, setShowAll] = useState(false);
   const router = useRouter();
   const text = TEXT[lang];
 
@@ -62,12 +65,13 @@ export function TokenmonPanel({ state, lang = "en" }: { state: TokenmonState; la
         </p>
       </div>
 
+      <ProviderOverview state={state} quotas={codexQuotas} status={codexStatus} lang={lang} />
       <div className="tm-summary">
         <TokenmonMeters
           fiveHour={state.fiveHour}
-          sevenDay={state.sevenDay}
           totals={state.totals}
           lastActivityAt={state.lastActivityAt}
+          claudeLastActivityAt={state.sessions.find(s => s.provider === "claude")?.savedAt ?? null}
           streakDays={state.streakDays}
           fedToday={state.fedToday}
           wastedFiveHourPct={state.wastedFiveHourPct}
@@ -81,7 +85,7 @@ export function TokenmonPanel({ state, lang = "en" }: { state: TokenmonState; la
         <h3>{text.rosterTitle}</h3>
         <span>
           {text.rosterCount(state.pets.length, state.activeSessionCount)}
-          <Link className="tm-open-link" href="/gallery">
+          <Link className="tm-open-link" href={`/gallery?lang=${lang}`}>
             {text.dex}
           </Link>
         </span>
@@ -90,12 +94,12 @@ export function TokenmonPanel({ state, lang = "en" }: { state: TokenmonState; la
         <div className="state">{text.empty}</div>
       ) : (
         <div className="tm-roster">
-          {state.pets.slice(0, MAX_PETS).map((pet) => (
-            <TokenmonPetCard key={pet.projectName} pet={pet} lang={lang} />
+          {(showAll ? state.pets : state.pets.slice(0, MAX_PETS)).map((pet) => (
+            <TokenmonPetCard key={pet.projectId || pet.projectName} pet={pet} lang={lang} />
           ))}
         </div>
       )}
-      {restingCount > 0 && <p className="tm-roster-more">{text.resting(restingCount)}</p>}
+      {restingCount > 0 && <button className="tm-button tm-roster-more" onClick={() => setShowAll(!showAll)}>{showAll ? (lang === "ko" ? "접기" : "Show less") : (lang === "ko" ? `${restingCount}마리 더 보기` : `Show ${restingCount} more`)}</button>}
 
       {!state.live && <p className="tm-note">{text.note}</p>}
     </section>
