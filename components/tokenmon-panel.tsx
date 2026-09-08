@@ -9,6 +9,7 @@ import type { TokenmonLang, TokenmonState } from "@/lib/tokenmon";
 import { TokenmonChart } from "./tokenmon-chart";
 import { TokenmonMeters } from "./tokenmon-meters";
 import { TokenmonPetCard } from "./tokenmon-pet";
+import { LanguageToggle } from "./language-toggle";
 
 const REFRESH_MS = 5_000;
 const MAX_PETS = 12;
@@ -60,9 +61,9 @@ export function TokenmonPanel({ state, lang = "en", codexQuotas = [], codexStatu
         <h2>
           Tokenmon <span className="tm-sub">{text.sub}</span>
         </h2>
-        <p>
+        <div className="tm-heading-actions"><p>
           {state.live ? <span className="status active">{text.live}</span> : <span className="status paused">{text.preview}</span>}
-        </p>
+        </p><LanguageToggle lang={lang} /></div>
       </div>
 
       <ProviderOverview state={state} quotas={codexQuotas} status={codexStatus} lang={lang} />

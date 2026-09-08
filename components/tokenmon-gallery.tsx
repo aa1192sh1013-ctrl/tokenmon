@@ -3,6 +3,7 @@ import { useState } from "react";
 import { COMMON_SPECIES_IDS, DINO_SPECIES_IDS, MYTHIC_SPECIES_IDS, type TokenmonLang } from "@/lib/tokenmon";
 import { getSpeciesInfo } from "./tokenmon-species";
 import { PetSprite } from "./tokenmon-sprite";
+import { LanguageToggle } from "./language-toggle";
 
 const IDS = [...COMMON_SPECIES_IDS, ...DINO_SPECIES_IDS, ...MYTHIC_SPECIES_IDS];
 export function TokenmonGallery({ lang = "en" }: { lang?: TokenmonLang }) {
@@ -13,7 +14,7 @@ export function TokenmonGallery({ lang = "en" }: { lang?: TokenmonLang }) {
   const info = getSpeciesInfo(selected, lang);
   const visible = IDS.filter(id => `${id} ${getSpeciesInfo(id, "en").label} ${getSpeciesInfo(id, "ko").label}`.toLowerCase().includes(query.toLowerCase()));
   return <section className="content-panel tokenmon-panel">
-    <div className="panel-heading"><h2>{ko ? "동물봇 도감" : "AnimalBot Dex"}<span className="tm-sub">60 {ko ? "종 · 알부터 최종 진화까지" : "species · egg to final form"}</span></h2></div>
+    <div className="panel-heading"><h2>{ko ? "동물봇 도감" : "AnimalBot Dex"}<span className="tm-sub">60 {ko ? "종 · 알부터 최종 진화까지" : "species · egg to final form"}</span></h2><LanguageToggle lang={lang} /></div>
     <div className="tm-dex-controls">
       <label>{ko ? "캐릭터 찾기" : "Find a companion"}<input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder={ko ? "늑대, 고양이, dragon…" : "Wolf, cat, dragon…"} /></label>
       <label>{ko ? "목록 미리보기 단계" : "Preview level"}<select value={previewLevel} onChange={e => setPreviewLevel(Number(e.target.value))}>{Array.from({ length: 21 }, (_, level) => <option key={level} value={level}>{level === 0 ? (ko ? "알 · Lv.0" : "Egg · Lv.0") : `Lv.${level}`}</option>)}</select></label>
